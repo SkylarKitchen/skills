@@ -1,6 +1,6 @@
 ---
 name: 3d-assembly-manual
-description: Build a phone-first interactive 3D step-by-step guide (LEGO-manual style, BIG diagram look) as a single-file Three.js artifact. Use when the user asks for a 3D build guide, install sequence, assembly/instruction manual, or "step-by-step 3D" for a physical task (garden, house, furniture, repair).
+description: Build a phone-first interactive 3D step-by-step guide (LEGO-manual style, BIG diagram look) as a single self-contained Three.js HTML file. Use when the user asks for a 3D build guide, install sequence, assembly/instruction manual, or "step-by-step 3D" for a physical task (garden, house, furniture, repair).
 ---
 
 # 3D assembly manual
@@ -36,18 +36,17 @@ PROJECT SCENE block: context geometry (auto-painted white), `wall(side, x0, x1, 
 ## Process
 1. Measure or estimate the real space from photos (mark "verify"); list parts grouped by where they come from.
 2. Write STEPS copy: plain instructions, 2-4 numbered acts, quantities in a mono meta line.
-3. Build (the starter has no dark-mode tokens: it commits to a light drawing sheet on purpose, which the artifact contract allows), then verify at 375 px in the browser pane over a localhost server (the pane can't act on file://; needs the viewport meta), and capture with headless Chrome through a 390x844 iframe harness at `#stepN&still`.
-4. Publish the single file (a private claude.ai Artifact works). Until you have a capture from the surface the reader will open, call the render unverified.
+3. Build (the starter has no dark-mode tokens: it commits to a light drawing sheet on purpose), then verify at 375 px in a browser over a localhost server (e.g. `python3 -m http.server`; keep the viewport meta), and capture with headless Chrome through a 390x844 iframe harness at `#stepN&still`.
+4. Deliver one `.html` file: Three.js and fonts load from a CDN, everything else is inline, so it opens by double-click or on any static host. Until you have a capture from the browser the reader will use, call the render unverified.
 
 ## Gotchas
 - MeshToonMaterial in shadow drops the whole directional term: keep ambient high or orange goes brown.
 - Keep pulse base colour under its own userData key (opacity code owns `userData.base`).
 - Emissive glow is invisible on white or accent parts; blink opacity instead.
-- Touch-only handlers can't be tested in the pane; use pointer events.
+- Touch-only handlers can't be tested with mouse-driven automation; use pointer events.
 - Rooms: work on opposite walls (sink run vs nook) needs two presets with different `v`, each cutting the walls between camera and work (learned on a kitchen build). The pale `fill` matters: a dark part fill hides the ink edges.
-- Numbers derived from another artifact (plank rows, rips) : port its calculation functions instead of retyping results.
+- Numbers derived from another file (plank rows, rips) : port its calculation functions instead of retyping results.
 - Captures: run headless Chrome one at a time, each under `perl -e 'alarm 50; exec @ARGV' <chrome --headless=new --user-data-dir=<scratch>/st-N --disable-gpu --use-angle=swiftshader --enable-unsafe-swiftshader --window-size=520,880 --timeout=15000 --screenshot=...>` (macOS has no `timeout`; it does not exit on its own), then `pkill -f user-data-dir=<scratch>/st-N`. Parallel runs give black canvases.
-- A shared browser pane may hold another session's tab; open your own and reset only your tab's viewport.
 
 ## Sources
-- Video with no transcript (music-only): read the burned-in captions from frames. Draw the paused video to a canvas at intervals, lay the frames out as a contact sheet on the page, screenshot it. Seeking in a background pane tab renders black.
+- Video with no transcript (music-only): read the burned-in captions from frames. Draw the paused video to a canvas at intervals, lay the frames out as a contact sheet on the page, screenshot it. Seeking in a background tab renders black.
