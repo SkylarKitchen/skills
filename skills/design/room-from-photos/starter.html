@@ -727,12 +727,16 @@ function plant(g, x, y, z, size, seed, upright){ /* a rosette of leaf cards from
     var k = 0.75 + r() * 0.4, c = new T.Color(upright ? 0x5d7a45 : 0x4e7440).multiplyScalar(k), a = new Float32Array(q.attributes.position.count * 3);
     for (var j = 0; j < a.length; j += 3){ a[j] = c.r; a[j + 1] = c.g; a[j + 2] = c.b; } q.setAttribute('color', new T.BufferAttribute(a, 3)); geos.push(q); }
   var m = new T.Mesh(mergeGeometries(geos), WM); m.userData.role = 7; m.userData.noAO = true; m.castShadow = m.receiveShadow = true; g.add(m); geos.forEach(function(q){ q.dispose(); }); return m; }
-function tube(g, pts, r, role, closed){ var c = new T.CatmullRomCurve3(pts, !!closed, 'catmullrom', 0.35), m = new T.Mesh(new T.TubeGeometry(c, Math.max(24, pts.length * 12), r, 10, !!closed), WM);   /* bent wood, a lamp's arc */
-  m.castShadow = m.receiveShadow = true; m.userData.role = role || 1; g.add(m); return c; }
-function strut(g, a, b, rb, rt, role){ var m = cyl(g, rb, rt, a.distanceTo(b), 0, 0, 0, role); m.position.copy(a).add(b).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(V(0, 1, 0), b.clone().sub(a).normalize()); return m; }
+function tube(g, pts, r, role, closed){ var c = pts.getPoint ? pts : new T.CatmullRomCurve3(pts, !!closed, 'catmullrom', 0.35), n = pts.getPoint ? 64 : Math.max(24, pts.length * 12), m = new T.Mesh(new T.TubeGeometry(c, n, r, 10, !!closed), WM);   /* bent wood, a lamp's arc; pts or a curve */
+  m.castShadow = m.receiveShadow = true; m.userData.role = role || 1; m.userData.thin = {pts: c.getSpacedPoints(n), r: r}; g.add(m); return c; }   /* thin: its centreline, for the audit */
+function strut(g, a, b, rb, rt, role, free){ var L = a.distanceTo(b), m = cyl(g, rb, rt, L, 0, 0, 0, role); m.position.copy(a).add(b).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(V(0, 1, 0), b.clone().sub(a).normalize());
+  m.userData.thin = {pts: [V(0, -L / 2, 0), V(0, L / 2, 0)], r: Math.max(rb, rt), free: free}; return m; }   /* free: [start, end] ends that stand free (a moss pole's top) */
 function shell(g, curve, w, t, n, role){ /* a cushion laid along a curve, in short rounded pieces */
   for (var i = 0; i < n; i++){ var a = curve.getPoint(i / n), b = curve.getPoint((i + 1) / n), dy = b.y - a.y, dz = b.z - a.z, len = Math.hypot(dy, dz);
     var m = part(g, w, t, len + t * 0.9, 0, (a.y + b.y) / 2 - t / 2, (a.z + b.z) / 2, role, {r: t * 0.45}); m.rotation.x = -Math.atan2(dy, dz); } }
+function arcLamp(it){ /* an arc lamp's shade: where the builder hangs it and the checks look for it. reach in front of the base; h is the arc's crown */
+  var h = it.h || 60, r = it.shade || 8, reach = it.arc, tip = h - Math.max(5, reach * 0.35), top = tip - 2.2, sh = r * 1.3;
+  return {reach: reach, r: r, rt: r * 0.72, sh: sh, tip: tip, top: top, bottom: top - sh, stem: Math.min(tip - 4, Math.max(h * 0.4, tip - reach * 1.1))}; }
 function drum(g, r0, r1, h, y, role){ var m = cyl(g, r0, r1, h, 0, y, 0, role, {seg: 40, kind: 'shade', noShadow: true}); m.geometry.dispose(); m.geometry = new T.CylinderGeometry(r1, r0, h, 40, 1, true); return m; }
 var BUILD = {
   lounge: function(g, it){ var w = it.w, d = it.d, h = it.h || 39, z0 = -d / 2, z1 = d / 2;   /* a bentwood lounge chair: two cantilever side frames and one long cushion */
@@ -747,9 +751,14 @@ var BUILD = {
     part(g, w - 2 * f, h - 2 * f, 0.3, 0, y + f, z + 0.35, 3, {edge: false});
     var pm = new T.Mesh(new T.PlaneGeometry(w - 2 * f - 2 * mm, h - 2 * f - 2 * mm), WM); pm.position.set(0, y + h / 2, z + 0.55); pm.receiveShadow = true; pm.userData.role = 2; pm.userData.kind = 'print'; g.add(pm); },
   floorlamp: function(g, it){ var h = it.h || 60, sr = it.shade || 8, sh = sr * 1.3;   /* a tripod lamp, or with arc: a heavy base and an arc that hangs the shade over a seat */
-    if (it.arc){ var reach = it.arc; cyl(g, 6, 6, 1.6, 0, 0, 0, 1, {seg: 32}); var top = h + 6;
-      tube(g, [V(0, 1.6, 0), V(0, top * 0.6, reach * 0.08), V(0, top, reach * 0.45), V(0, top - 4, reach * 0.85), V(0, h - sh * 0.2, reach)], 0.45, 1);
-      drum(g, sr, sr * 0.72, sh, h - sh, 2); return; }
+    if (it.arc){ var A = arcLamp(it), rb = Math.min(it.w, it.d) / 2 - 0.5, tr = 0.45;   /* heavy base, a rising stem, one arc whose tip drops into the shade's socket */
+      cyl(g, rb, rb * 0.97, 1.8, 0, 0, 0, 1, {seg: 40}); cyl(g, 1.3, 1.1, 1.2, 0, 1.8, 0, 1, {seg: 20}); strut(g, V(0, 1.8, 0), V(0, A.stem, 0), 0.6, tr, 1);
+      var S = V(0, A.stem, 0), E = V(0, A.tip, A.reach), lo = A.tip, hi = 2 * h, arc;   /* vertical at both ends: it rises out of the stem and drops plumb into the socket */
+      for (var n = 0; n < 24; n++){ var Y = (lo + hi) / 2, top = 0; arc = new T.CubicBezierCurve3(S, V(0, Y, 0), V(0, Y, A.reach), E);
+        for (var t = 0; t <= 1; t += 0.02) top = Math.max(top, arc.getPoint(t).y); if (top > h - tr) hi = Y; else lo = Y; }   /* its crown sits at h */
+      tube(g, arc, tr, 1); cyl(g, 0.75, 0.9, A.tip - A.top + 0.4, 0, A.top - 0.4, A.reach, 1, {seg: 16});   /* the socket, through the shade's top ring */
+      [0, 1, 2].forEach(function(i){ var a = i * 2.094 + 0.3; strut(g, V(0, A.top + 0.3, A.reach), V(Math.cos(a) * (A.rt - 0.2), A.top - 0.1, A.reach + Math.sin(a) * (A.rt - 0.2)), 0.12, 0.12, 1); });   /* the spider */
+      drum(g, A.r, A.rt, A.sh, A.bottom, 2).position.z = A.reach; return; }
     var hub = h * 0.62, sp = Math.min(it.w, it.d) / 2 - 1;
     [0, 1, 2].forEach(function(i){ var a = i * 2.094 + 0.5; strut(g, V(Math.cos(a) * sp, 0, Math.sin(a) * sp), V(0, hub, 0), 0.55, 0.45, 1); });
     strut(g, V(0, hub - 2, 0), V(0, h - sh + 1, 0), 0.4, 0.4, 1); drum(g, sr, sr, sh, h - sh, 2); },
@@ -1121,6 +1130,8 @@ function audit(){ var out = [], v = new T.Vector3(), inv = new T.Matrix4(), t = 
     if (it.arc && sb){ var sx = (sb[0] + sb[1]) / 2, sz = (sb[2] + sb[3]) / 2;
       if (Math.abs(sx) > 1 || Math.abs(sz - it.arc) > 1) out.push({id: k, rule: 'reach', text: it.name + '’s shade hangs ' + sz.toFixed(1) + '″ in front of its base, not at the arc’s end (' + it.arc + '″)'}); } });
   return out; }
+if (HASH.debug && HASH.frame && OBJ[HASH.frame]){ var fb = new T.Box3().setFromObject(OBJ[HASH.frame]), fc = fb.getCenter(V(0, 0, 0)), fs = fb.getSize(V(0, 0, 0));   /* #frame=<id>: a close-up of one piece, for the visual sweep */
+  view.tx = fc.x; view.ty = fc.y; view.tz = fc.z; view.r = Math.max(fs.x, fs.y, fs.z) * 0.62 + 4; if (HASH.el) view.el = +HASH.el * Math.PI / 180; curView = null; SEG.forEach(function(sg){ sg.target = sg.cut = 0.5; applyCut(sg); }); dirty3 = true; }
 if (HASH.debug){ ROOM.audit = audit; if (HASH.test){ var c0 = cur, all = [];
   LAYOUTS.forEach(function(L, i){ setLayout(i); audit().forEach(function(f){ f.layout = i + 1; all.push(f); }); }); setLayout(c0);
   var pre = document.createElement('pre'); pre.id = 'audit'; pre.textContent = JSON.stringify(all); document.body.appendChild(pre); } }
