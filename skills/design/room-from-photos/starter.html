@@ -42,6 +42,7 @@ header .sub{font-size:12.5px;color:var(--ink-2)}
 .panel section{padding:12px 0;border-bottom:1px solid var(--rule)}
 .panel section:last-child{border-bottom:0}
 .panel h2{font-size:11px;font-family:var(--mono);font-weight:400;color:var(--ink-3);margin:0 0 6px}
+.opth{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.opth button{height:22px;padding:0 8px;font-size:11.5px;margin-top:-4px}
 .panel p{margin:0 0 8px}
 .checks{list-style:none;margin:0 0 8px;padding:0}
 .checks li{display:grid;grid-template-columns:14px 1fr;gap:4px;padding:2px 0}
@@ -129,13 +130,13 @@ dialog textarea{width:min(520px,84vw);height:200px;font:12px var(--mono);border:
     <div class="ctl tl" id="photoBar" hidden><span id="phName"></span><input type="range" id="phOp" min="0" max="1" step="0.05" value="0.5" aria-label="Photo overlay"><button id="phExit">Back to model</button></div>
   </div>
   <aside class="panel">
-    <section><h2 id="optH"></h2><p id="note"></p><ul class="checks" id="checks"></ul><div class="metric" id="metric"></div></section>
+    <section><div class="opth"><h2 id="optH"></h2><button id="reset" hidden></button></div><p id="note"></p><ul class="checks" id="checks"></ul><div class="metric" id="metric"></div></section>
     <section class="insp" id="insp"></section>
     <section id="roomS"><h2>Room · this option</h2><div class="looks" id="looks"></div><div id="roomFin"></div></section>
     <section><h2>Pieces · tap one to change it</h2><div class="chips pieces" id="tray"></div></section>
     <section id="photosS"><h2>Photos · the model drawn over each one</h2><div class="thumbs" id="thumbs"></div><div class="tune" id="tune" hidden></div></section>
     <section class="facts" id="facts"></section>
-    <section><div class="row"><button id="copy">Copy layout for Claude</button><button id="dup">Save as new option</button><button id="reset">Reset option</button></div></section>
+    <section><div class="row"><button id="copy">Copy layout for Claude</button><button id="dup">Save as new option</button></div></section>
   </aside>
 </div>
 </div>
@@ -1131,7 +1132,9 @@ function letter(i){ return String.fromCharCode(65 + i); }
 function renderTabs(){ var box = $('#tabs'); box.textContent = ''; LAYOUTS.forEach(function(L, i){ var ev = EVAL[i], b = el('button', i === cur ? 'on' : '');
   b.appendChild(el('b', '', letter(i))); b.appendChild(document.createTextNode(L.name)); b.appendChild(el('small', '', 'open ' + fmt(ev.open.size) + ' sq' + (ev.issues ? ' · ' + ev.issues + ' to fix' : '')));
   b.onclick = function(){ setLayout(i); }; box.appendChild(b); }); }
-function refreshPanel(){ var L = LAYOUTS[cur], ev = EVAL[cur]; $('#optH').textContent = 'Option ' + letter(cur); $('#note').textContent = L.note || '';
+function refreshPanel(){ var L = LAYOUTS[cur], ev = EVAL[cur]; $('#optH').textContent = 'Option ' + letter(cur); var extra = cur >= BASE.length, B = BASE[cur], rs = $('#reset');
+  rs.hidden = !extra && ['place', 'colors', 'variants', 'added'].every(function(f){ return JSON.stringify(L[f]) === JSON.stringify(B[f]); }); rs.textContent = extra ? 'Delete option' : 'Reset';   /* shown once the option differs from how it was first laid out */
+  rs.title = extra ? 'Remove this saved option' : 'Put this option back the way it was first laid out'; $('#note').textContent = L.note || '';
   var ul = $('#checks'); ul.textContent = ''; ev.lines.forEach(function(l){ var li = el('li', l.level); li.appendChild(el('i')); li.appendChild(el('span', '', l.text));
     if (l.ks.length){ li.dataset.k = l.ks[0]; li.onclick = function(){ select(l.ks[0]); }; } ul.appendChild(li); });
   $('#metric').textContent = 'Open floor ' + Math.round(ev.open.area) + ' sq ft · biggest clear square ' + fmt(ev.open.size);
