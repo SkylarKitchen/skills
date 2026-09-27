@@ -19,7 +19,7 @@ var CONFIG = {
   ITEMS: {
     bed:      {name: 'Bed', type: 'bed', w: 41, d: 80, h: 22, hb: 40},
     stand:    {name: 'Nightstand', type: 'nightstand', w: 16, d: 16, h: 22},
-    crib:     {name: 'Crib', type: 'crib', w: 30, d: 54, h: 40},
+    crib:     {name: 'Crib', type: 'crib', w: 54, d: 30, h: 40},
     dresser:  {name: 'Dresser', type: 'dresser', w: 48, d: 19, h: 32},
     desk:     {name: 'Desk', type: 'desk', w: 42, d: 22, h: 29},
     shelf:    {name: 'Bookshelf', type: 'bookshelf', w: 30, d: 12, h: 60},
@@ -52,7 +52,7 @@ var CONFIG = {
   },
   LAYOUTS: [
     {name: 'Bedroom pieces', note: 'Bed, nightstand, crib, dresser, desk and chair, bookshelf, wardrobe, rug, box, pet bed.',
-     place: {bed: [30, 40, 0], stand: [60, 8, 0], crib: [215, 27, 0], dresser: [130, 190.5, 180], desk: [200, 189, 180], shelf: [254, 170, 90],
+     place: {bed: [30, 40, 0], stand: [60, 8, 0], crib: [215, 16, 0], dresser: [130, 190.5, 180], desk: [200, 189, 180], shelf: [254, 170, 90],
        wardrobe: [80, 188, 180], rug: [120, 100, 0], box: [140, 20, 0], petbed: [100, 60, 0]}},
     {name: 'Living pieces', note: 'Sofa, armchair, lounge chairs with and without a throw, chair, three tables, ottoman, TV on its console.',
      place: {sofa: [130, 150, 180], coffee: [130, 105, 0], glass: [60, 60, 0], round: [200, 150, 0], armchair: [50, 120, 270], lounge: [200, 55, 315],

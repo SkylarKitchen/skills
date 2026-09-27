@@ -784,7 +784,7 @@ var BUILD = {
     [0, 1, 2].forEach(function(i){ var a = i * 2.094 + 0.5; strut(g, V(Math.cos(a) * sp, 0, Math.sin(a) * sp), V(0, hub, 0), 0.55, 0.45, 1); });
     strut(g, V(0, hub - 2, 0), V(0, h - sh + 1, 0), 0.4, 0.4, 1); drum(g, sr, sr, sh, h - sh, 2); },
   floorplant: function(g, it){ var w = it.w, h = it.h || 48, R = w / 2, r = rnd(it.seed || 11), geos = [], lim = {x: 0, z: 0, r: R, top: h}, i, j, n, a, ll, y;   /* w is the canopy's spread and h its top; the pot scales from w */
-    var pr = Math.max(2.5, Math.min(8, R * (it.upright || it.pole ? 0.62 : 0.5))), ph = Math.min(16, pr * 1.9);
+    var low = !it.upright && !it.pole && h < 30, pr = Math.max(2.5, Math.min(8, R * (low ? 0.7 : it.upright || it.pole ? 0.62 : 0.5))), ph = Math.min(16, pr * 1.9);   /* a low mound's pot is nearly its spread; a tree's about half */
     cyl(g, pr * 0.8, pr, ph, 0, 0, 0, 1, {seg: 28}); cyl(g, pr * 0.93, pr * 0.93, 0.3, 0, ph - 1, 0, 9, {seg: 28, noShadow: true});
     if (it.upright){ n = 10 + Math.round(R); for (i = 0; i < n; i++){ var f = i ? 0.45 + r() * 0.5 : 1, o = r() * pr * 0.55; ll = (h - ph + 1) * f; a = r() * 6.283;   /* sword leaves: the tallest plumb at h, shorter ones leaning out */
         leaf(geos, V(Math.cos(a) * o, ph - 1, Math.sin(a) * o), ll, Math.min(3.4, ll * 0.14), a + (r() - 0.5), (1.05 - f) * 0.45 + r() * 0.08, r() * 0.3, 0x5d7a45, 0.7 + r() * 0.45, lim); } }
@@ -794,8 +794,8 @@ var BUILD = {
       for (j = 0; j < 5; j++){ var a0 = j * 1.257 + r() * 0.6, up = j % 2 === 0, y0 = up ? top - 1 - r() * 6 : ph, r0 = up ? 1.2 : pr * 0.9, m = 7;   /* vines: from high on the pole, and over the pot's rim */
         for (i = 0; i < m; i++){ var k = i / (m - 1), rr = r0 + (R - 1.2 - r0) * Math.sqrt(k); y = y0 + 1 - (up ? 16 : ph - 2) * k * k;
           leaf(geos, V(Math.cos(a0) * rr, y, Math.sin(a0) * rr), ll * (0.7 - k * 0.25), ll * 0.44, a0 + (r() - 0.5) * 1.2, 1.5 + r() * 0.5, 0.7 + r() * 0.6, 0x4e7440, 0.68 + r() * 0.5, lim); } } }
-    else { n = it.heads || 3; var cr = Math.min(R * 0.62, (h - ph) * 0.36), cv = Math.min(cr * 1.1, (h - ph) * 0.3), hr = Math.max(0, R - cr) * 0.8;   /* stems up to leafy heads; their leaves sit on each head's round shell, facing out */
-      for (i = 0; i < n; i++){ a = i * 6.283 / n + r() * 0.8; y = h - cv * (1 + r() * 0.35); var hx = Math.cos(a) * hr, hz = Math.sin(a) * hr, m = Math.round(30 + cr * 5);
+    else { n = it.heads || 3; var cr = Math.min(R * (low ? 0.72 : 0.62), (h - ph) * 0.36), cv = low ? (h - ph) * 0.48 : Math.min(cr * 1.3, (h - ph) * 0.34), hr = Math.max(0, R - cr) * 0.8;   /* stems up to leafy heads, their leaves on each head's shell facing out; under 30″ the heads make one mound from the soil up */
+      for (i = 0; i < n; i++){ a = i * 6.283 / n + r() * 0.8; y = low ? ph + cv * (0.95 + r() * 0.1) : h - cv * (1 + r() * 0.35); var hx = Math.cos(a) * hr, hz = Math.sin(a) * hr, m = Math.round(30 + cr * 6);
         strut(g, V((r() - 0.5) * pr * 0.4, ph - 1, (r() - 0.5) * pr * 0.4), V(hx, y, hz), Math.min(0.7, pr * 0.12), 0.3, 6);
         for (j = 0; j < m; j++){ var u = r() * 2 - 1, t = r() * 6.283, sh = 0.35 + 0.6 * Math.sqrt(r()), dx = Math.sqrt(1 - u * u) * Math.cos(t), dz = Math.sqrt(1 - u * u) * Math.sin(t);
           ll = cr * (0.38 + r() * 0.3);
@@ -1201,8 +1201,9 @@ function audit(){ var out = [], v = new T.Vector3(), q = new T.Vector3(), inv = 
   return out; }
 function segDist(p, a, b){ var ab = b.clone().sub(a), l2 = ab.lengthSq(), k = l2 ? Math.max(0, Math.min(1, p.clone().sub(a).dot(ab) / l2)) : 0; return p.distanceTo(a.clone().add(ab.multiplyScalar(k))); }
 function fmtIn(v){ return Math.round(v * 10) / 10 + '″'; }
-if (HASH.debug && HASH.frame && OBJ[HASH.frame]){ var fb = new T.Box3().setFromObject(OBJ[HASH.frame]), fc = fb.getCenter(V(0, 0, 0)), fs = fb.getSize(V(0, 0, 0));   /* #frame=<id>: a close-up of one piece, for the visual sweep */
-  view.tx = fc.x; view.ty = fc.y; view.tz = fc.z; view.r = Math.max(fs.x, fs.y, fs.z) * 0.62 + 4; if (HASH.el) view.el = +HASH.el * Math.PI / 180; curView = null; SEG.forEach(function(sg){ sg.target = sg.cut = 0.5; applyCut(sg); }); dirty3 = true; }
+if (HASH.debug && HASH.frame){ var fo = OBJ[HASH.frame] || (FIXOBJ.filter(function(F){ return F.id === HASH.frame; })[0] || {}).g; if (fo){   /* #frame=<id>: a close-up of one piece (or built-in), for the visual sweep */
+  var fb = new T.Box3().setFromObject(fo), fc = fb.getCenter(V(0, 0, 0)), fs = fb.getSize(V(0, 0, 0)); view.tx = fc.x; view.ty = fc.y; view.tz = fc.z; view.r = Math.max(fs.x, fs.y, fs.z) * 0.62 + 4;
+  if (HASH.el) view.el = +HASH.el * Math.PI / 180; curView = null; cutTargets(); SEG.forEach(function(sg){ sg.cut = sg.target; applyCut(sg); }); dirty3 = true; } }
 if (HASH.debug){ ROOM.audit = audit; if (HASH.test){ var c0 = cur, all = [];
   var checks = []; LAYOUTS.forEach(function(L, i){ setLayout(i); audit().forEach(function(f){ f.layout = i + 1; all.push(f); }); EVAL[i].lines.forEach(function(l){ checks.push({layout: i + 1, level: l.level, text: l.text}); }); }); setLayout(c0);
   [['audit', all], ['checks', checks]].forEach(function(x){ var pre = document.createElement('pre'); pre.id = x[0]; pre.textContent = JSON.stringify(x[1]); document.body.appendChild(pre); }); } }   /* checks: what the panel says, for a fixture's expect.json */
