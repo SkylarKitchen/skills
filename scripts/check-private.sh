@@ -2,7 +2,7 @@
 # Fails when a tracked file carries private details: a home-directory path, or a
 # term from a denylist kept outside this public repo (the list itself is private).
 set -euo pipefail
-cd "$(dirname "$(readlink -f "$0")")/.."   # readlink: also runs as the pre-commit hook symlink
+cd "$(git rev-parse --show-toplevel)"   # the tree being committed: a hook resolved by its symlink would scan the main checkout from a linked worktree
 
 LIST="${SKILLS_PRIVATE_TERMS:-$HOME/.config/skills/private-terms.txt}"
 found=0
