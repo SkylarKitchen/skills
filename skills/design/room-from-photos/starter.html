@@ -1224,12 +1224,13 @@ var LIB_BASE = [
   {id: 'queen', group: 'beds', name: 'Queen bed', type: 'bed', w: 60, d: 80, h: 22, hb: 44}, {id: 'king', group: 'beds', name: 'King bed', type: 'bed', w: 76, d: 80, h: 22, hb: 46},
   {id: 'crib', group: 'beds', name: 'Crib', type: 'crib', w: 28, d: 52, h: 40},
   {id: 'tripod', group: 'lighting', name: 'Tripod floor lamp', type: 'floorlamp', w: 20, d: 20, h: 60, shade: 9}, {id: 'arc', group: 'lighting', name: 'Arc lamp', type: 'floorlamp', w: 14, d: 14, h: 72, arc: 30, shade: 9},
-  {id: 'tree', group: 'plants', name: 'Tree', type: 'floorplant', w: 16, d: 16, h: 72, heads: 3}, {id: 'snake', group: 'plants', name: 'Snake plant', type: 'floorplant', w: 12, d: 12, h: 40, upright: true},
-  {id: 'climber', group: 'plants', name: 'Climber on a pole', type: 'floorplant', w: 12, d: 12, h: 54, pole: true},
+  {id: 'tree', group: 'plants', name: 'Tree', type: 'floorplant', w: 28, d: 28, h: 72, heads: 3}, {id: 'snake', group: 'plants', name: 'Snake plant', type: 'floorplant', w: 14, d: 14, h: 40, upright: true},
+  {id: 'climber', group: 'plants', name: 'Climber on a pole', type: 'floorplant', w: 18, d: 18, h: 54, pole: true},
   {id: 'rug5x8', group: 'rugs', name: 'Rug 5 × 8', type: 'rug', w: 96, d: 60}, {id: 'rug8x10', group: 'rugs', name: 'Rug 8 × 10', type: 'rug', w: 120, d: 96}, {id: 'rug9x12', group: 'rugs', name: 'Rug 9 × 12', type: 'rug', w: 144, d: 108},
   {id: 'petbed', group: 'walls', name: 'Pet bed', type: 'petbed', w: 30, d: 24, h: 8}, {id: 'walltv', group: 'walls', name: 'Wall TV', type: 'media', w: 48, d: 3, h: 27, tv: 55, mount: 58},
-  {id: 'art', group: 'walls', name: 'Art', type: 'art', w: 24, d: 1.5, h: 30, mount: 54, print: 'abstract'}
-];
+  {id: 'art', group: 'walls', name: 'Art', type: 'art', w: 24, d: 1.5, h: 30, mount: 54, print: 'abstract'}, {id: 'landscape', group: 'walls', name: 'Landscape print', type: 'art', w: 36, d: 1.5, h: 24, mount: 54, print: 'landscape'},
+  {id: 'poster', group: 'walls', name: 'Poster', type: 'art', w: 18, d: 1, h: 24, mount: 50, print: 'poster'}, {id: 'mirror', group: 'walls', name: 'Mirror', type: 'art', w: 30, d: 1.5, h: 24, mount: 56, print: 'mirror'}
+];   /* plant w is the canopy's spread, not the pot */
 var LIB = (function(){ var c = C.LIBRARY, own = Array.isArray(c) ? c : c && c.entries || [];   /* the room's own entries first; {base: false} drops the catalogue */
   return own.map(function(e){ var o = {}; for (var k in e) o[k] = e[k]; if (!o.group) o.group = 'here'; if (!o.id) o.id = o.type; return o; }).concat(c && c.base === false ? [] : LIB_BASE); })();
 function libEntries(){ var L = LAYOUTS[cur]; return Object.keys(BASEIT).filter(function(k){ return !L.place[k]; }).map(function(k){ return {id: k, group: 'room', room: true}; }).concat(LIB); }   /* the option's pieces taken out, then the catalogue */
@@ -1378,6 +1379,7 @@ if (HASH.debug && HASH.frame){ var fo = OBJ[HASH.frame] || (FIXOBJ.filter(functi
   if (HASH.el) view.el = +HASH.el * Math.PI / 180; curView = null; cutTargets(); SEG.forEach(function(sg){ sg.cut = sg.target; applyCut(sg); }); dirty3 = true; } }
 if (HASH.debug){ ROOM.audit = audit; if (HASH.test){ var c0 = cur, all = [];
   var checks = []; LAYOUTS.forEach(function(L, i){ setLayout(i); audit().forEach(function(f){ f.layout = i + 1; all.push(f); }); EVAL[i].lines.forEach(function(l){ checks.push({layout: i + 1, level: l.level, text: l.text}); }); }); setLayout(c0);
+  var lib = libEntries().filter(function(e){ return !e.room; }).map(addPiece); audit().forEach(function(f){ if (lib.indexOf(f.id) >= 0){ f.layout = 0; all.push(f); } }); lib.forEach(remove);   /* every catalogue piece passes too (layout 0) */
   [['audit', all], ['checks', checks]].forEach(function(x){ var pre = document.createElement('pre'); pre.id = x[0]; pre.textContent = JSON.stringify(x[1]); document.body.appendChild(pre); }); } }   /* checks: what the panel says, for a fixture's expect.json */
 if (HASH.debug && (HASH.libadd || HASH.libtest)){ /* debug only: libadd=sofa3,art adds those catalogue entries; libtest adds two, takes one out, and writes what the page stores and copies to pre#libtest */
   var byId = function(id){ return libEntries().filter(function(e){ return !e.room && e.id === id; })[0]; }, got = [];

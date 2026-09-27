@@ -47,7 +47,7 @@ for d in dirs:
             found += [{'layout': int(opt), 'text': 'the checks should say “%s”' % t} for t in e.get('has', []) if t not in said]
             found += [{'layout': int(opt), 'text': 'the checks should not say “%s”' % t} for t in e.get('not', []) if t in said]
     print('ok  ' if not found else 'FAIL', name, '' if not found else '')
-    for f in found: print('     option %d: %s' % (f['layout'], f['text']))
+    for f in found: print('     %s: %s' % ('library' if f['layout'] == 0 else 'option %d' % f['layout'], f['text']))
     bad += bool(found)
     shutil.rmtree(tmp, ignore_errors=True)
 sys.exit(1 if bad else 0)
