@@ -1,0 +1,131 @@
+<!doctype html>
+<!-- launch-film engine: every frame is a pure function of t (seconds).
+     capture.cjs loads this with ?plan=<file URL of plan.js> and calls render(t). -->
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; background: #000; }
+</style>
+<canvas id="c"></canvas>
+<script>
+// Logical frame (plan.frame, default 1280x720) drawn at plan.scale into the canvas (e.g. 1.5 -> 1920x1080).
+let W = 1280, H = 720, SC = 1; const c = document.getElementById("c"), g = c.getContext("2d");
+const ease = (x) => (x = Math.min(1, Math.max(0, x)), x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const lerp = (a, b, k) => a + (b - a) * k;
+// Keyframe track: [[t, value], ...] eased between keys.
+const track = (keys, t) => {
+  if (t <= keys[0][0]) return keys[0][1];
+  for (let i = 1; i < keys.length; i++) if (t <= keys[i][0]) {
+    const [t0, a] = keys[i - 1], [t1, b] = keys[i], k = ease((t - t0) / (t1 - t0));
+    return Array.isArray(a) ? a.map((v, j) => lerp(v, b[j], k)) : lerp(a, b, k);
+  }
+  return keys[keys.length - 1][1];
+};
+// Seeded grain tile, offset per frame so it shimmers deterministically.
+const grain = document.createElement("canvas"); grain.width = grain.height = 256;
+{ const x = grain.getContext("2d"), d = x.createImageData(256, 256); let s = 7;
+  for (let i = 0; i < d.data.length; i += 4) { s = (s * 16807) % 2147483647; const v = s % 255;
+    d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 22; } x.putImageData(d, 0, 0); }
+const addGrain = (t) => { g.save(); g.globalCompositeOperation = "overlay";
+  const o = Math.floor(t * 25) * 37 % 256; g.fillStyle = g.createPattern(grain, "repeat");
+  g.translate(-o, -o * 1.7 % 256); g.fillRect(0, 0, W + 512, H + 512); g.restore(); };
+const word = (txt, x, y, size, color, font = FONT, alpha = 1) => {
+  g.save(); g.globalAlpha = alpha; g.fillStyle = color; g.font = `${size}px ${font}`;
+  g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(txt, x, y); g.restore(); };
+
+// Image cover-fitted to the frame (centre crop), optionally zoomed about the centre.
+const cover = (im, z = 1) => { const k = Math.max(W / im.width, H / im.height) * z; g.drawImage(im, (W - im.width * k) / 2, (H - im.height * k) / 2, im.width * k, im.height * k); };
+// Plan-level captions over any scene, in film time: {text, from, to, row, tag}. A white label top-left: sentence case, square corners,
+// an optional dark letter tag (a layout's A/B/C). plan.caption tunes x, y, gap, size, small, ink, bg.
+function captions(list, t) { const C = PLAN.caption || {};
+  for (const c of list) { if (t < c.from || t > c.to) continue; const a = Math.min(ease((t - c.from) / .3), 1 - ease((t - c.to + .3) / .3));
+    const x = C.x ?? 36, y = (C.y ?? 36) + (c.row || 0) * (C.gap ?? 50), size = c.row ? (C.small ?? 19) : (C.size ?? 24), pad = size * .62, h = size * 1.9, f = `${c.row ? 500 : 600} ${size}px ${FONT}`;
+    g.save(); g.globalAlpha = a; g.translate(0, (1 - a) * 8); g.font = f;
+    const tag = c.tag ? h * .6 : 0, w = g.measureText(c.text).width + pad * 2 + (tag ? tag + pad * .55 : 0);
+    g.shadowColor = "rgba(0,0,0,.14)"; g.shadowBlur = 18; g.shadowOffsetY = 4; g.fillStyle = C.bg || "#fff"; g.beginPath(); g.roundRect(x, y, w, h, 3); g.fill(); g.shadowColor = "transparent";
+    let tx = x + pad; g.textBaseline = "middle";
+    if (tag) { g.fillStyle = C.ink || "#141414"; g.beginPath(); g.roundRect(tx, y + (h - tag) / 2, tag, tag, 2); g.fill();
+      g.fillStyle = C.bg || "#fff"; g.textAlign = "center"; g.font = `600 ${size * .78}px ${FONT}`; g.fillText(c.tag, tx + tag / 2, y + h / 2 + 1); tx += tag + pad * .55; g.font = f; }
+    g.fillStyle = C.ink || "#141414"; g.textAlign = "left"; g.fillText(c.text, tx, y + h / 2 + 1); g.restore(); } }
+// Cursor for a product scene: an eased path with click times, or per-frame positions recorded with the UI (cursor.frames, image px / scale).
+function cursorAt(s, lt) { const c = s.cursor; if (!c) return null;
+  if (c.frames) { const fps = c.fps || 30, n = c.frames.length, i = Math.min(n - 1, Math.floor((lt - (c.at || 0)) * fps + 1e-3)); if (i < 0 || (c.hide || []).some(([a, b]) => lt >= a && lt < b)) return null;
+    const q = c.frames[i], k = c.scale || 1, [sx, sy, sw, sh] = s.crop; let cl = null;
+    for (let j = i; j > 0; j--) if (c.frames[j].down && !c.frames[j - 1].down) { cl = (c.at || 0) + j / fps; break; }
+    return { x: q.x * k - sx - sw / 2, y: q.y * k - sy - sh / 2, cl, down: q.down }; }
+  if (lt < c.path[0][0] || (c.hide || []).some(([a, b]) => lt >= a && lt < b)) return null;
+  const [x, y] = track(c.path, lt); return { x, y, cl: [c.click, ...(c.clicks || [])].filter((v) => v != null && lt >= v).pop() }; }
+
+const SCENES = {
+  // Continuous product take: UI crop floating on a flat canvas, camera track, cursor.
+  product(s, lt) {
+    g.fillStyle = s.bg; g.fillRect(0, 0, W, H);
+    const [cx, cy, z] = track(s.camera, lt), [sx, sy, sw, sh] = s.crop;
+    g.save(); g.translate(W / 2, H / 2); g.scale(z, z); g.translate(-cx, -cy);
+    g.shadowColor = "rgba(40,30,20,.18)"; g.shadowBlur = 60; g.shadowOffsetY = 18;
+    g.fillStyle = "#fff"; g.beginPath(); g.roundRect(-sw / 2, -sh / 2, sw, sh, 18); g.fill(); g.shadowColor = "transparent";
+    g.save(); g.clip(); g.drawImage(s._img || IMG[s.image], sx, sy, sw, sh, -sw / 2, -sh / 2, sw, sh); g.restore();
+    // Interactive states: from `at`, a section of the page is replaced by a captured state (hover, click result).
+    for (const sec of s.states || []) { const cur = sec.keys.filter(([a]) => lt >= a).pop();
+      if (cur && cur[1]) { g.save(); g.clip(); g.drawImage(IMG[cur[1]], -sw / 2, -sh / 2 + sec.y0); g.restore(); } }
+    // Drawn hover states where the page has none: band (row highlight), underline (nav), ring (card).
+    for (const h of s.hovers || []) if (lt >= h.at && lt < h.until) { const [x, y, w, hh] = h.rect, a = Math.min(1, (lt - h.at) / .12, (h.until - lt) / .12);
+      g.save(); g.globalAlpha = a;
+      if (h.style === "band") { g.fillStyle = h.color || "rgba(17,17,17,.06)"; g.fillRect(x, y, w, hh); }
+      else if (h.style === "underline") { g.fillStyle = s.ink; g.fillRect(x, y, w, hh); }
+      else { g.strokeStyle = h.color || s.ink; g.lineWidth = 2 / z; g.beginPath(); g.roundRect(x, y, w, hh, 6); g.stroke(); }
+      g.restore(); }
+    const cu = cursorAt(s, lt); if (cu) { const { x, y, cl } = cu, rip = s.cursor.ripple || "17,17,17";
+      if (cl != null && lt > cl && lt < cl + .5) { g.strokeStyle = "rgba(" + rip + "," + (1 - (lt - cl) * 2) + ")"; g.lineWidth = 3 / z;
+        g.beginPath(); g.arc(x, y, (8 + (lt - cl) * 60) / (s.cursor.frames ? z : 1), 0, Math.PI * 2); g.stroke(); }
+      const press = cu.down != null ? (cu.down ? .88 : 1) : (cl != null && Math.abs(lt - cl - .06) < .06 ? .85 : 1);
+      g.save(); g.translate(x, y); g.scale(1.4 / z * press, 1.4 / z * press);
+      g.fillStyle = "#111"; g.strokeStyle = "#fff"; g.lineWidth = 1.5; g.beginPath();
+      g.moveTo(0, 0); g.lineTo(0, 17); g.lineTo(4.5, 13); g.lineTo(8, 20); g.lineTo(10.5, 19); g.lineTo(7, 12); g.lineTo(13, 12); g.closePath(); g.fill(); g.stroke(); g.restore(); }
+    g.restore();
+    if (s.headline) { const [a, b] = s.headline.window, al = Math.min(ease((lt - a) / .4), 1 - ease((lt - b + .3) / .3));
+      word(s.headline.text, W / 2, H * .5, 46, s.ink, FONT, al); }
+  },
+  // Two-line tagline, lines rise in with a short stagger.
+  tagline(s, lt) { g.fillStyle = s.bg; g.fillRect(0, 0, W, H);
+    s.lines.forEach((l, i) => { const k = ease((lt - .15 - i * .35) / .6); word(l, W / 2, H / 2 - 28 + i * 58 + (1 - k) * 14, 44, s.ink, FONT, k); }); },
+  // Title card: the name rises in, with an optional plain line under it; typeOn types the name instead.
+  title(s, lt) { g.fillStyle = s.bg; g.fillRect(0, 0, W, H);
+    if (s.typeOn) { const txt = s.text.slice(0, Math.floor(Math.max(0, lt - .25) / .07) + 1); word(txt.padEnd(s.text.length, " "), W / 2, H / 2, s.size || 68, s.ink); return; }
+    const k1 = ease((lt - .1) / .6), k2 = ease((lt - .45) / .6);
+    g.save(); g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = s.ink; g.globalAlpha = k1; g.font = `${s.weight || 600} ${s.size || 68}px ${FONT}`;
+    g.fillText(s.text, W / 2, H / 2 - (s.sub ? 18 : 0) + (1 - k1) * 14);
+    if (s.sub) { g.globalAlpha = k2; g.fillStyle = s.subInk || s.ink; g.font = `500 ${s.subSize || 24}px ${FONT}`; g.fillText(s.sub, W / 2, H / 2 + (s.size || 68) * .62 + (1 - k2) * 10); }
+    g.restore(); },
+  // A frame sequence rendered elsewhere (a GPU-rendered 3D shot), full-bleed; `from` wipes it in over a still: {image, wipe: [t0, t1]}.
+  frames(s, lt) { g.fillStyle = s.bg || "#000"; g.fillRect(0, 0, W, H); cover(s._img);
+    if (s.from) { const [a, b] = s.from.wipe, k = ease((lt - a) / (b - a)); if (k < 1) { const x = W * k;
+      g.save(); g.beginPath(); g.rect(x, 0, W - x, H); g.clip(); cover(IMG[s.from.image]); g.restore();
+      if (k > 0) { g.save(); g.shadowColor = "rgba(0,0,0,.35)"; g.shadowBlur = 14; g.fillStyle = "#fff"; g.fillRect(x - 1.5, 0, 3, H); g.restore(); } } } },
+  // Opener shot from a project image (drawing, photo): slow push, optional word.
+  still(s, lt) { g.fillStyle = s.bg; g.fillRect(0, 0, W, H); const im = IMG[s.image], z = (s.fit || .78) * H / im.height * (1 + lt * .03);
+    if (s.cover) cover(im, 1 + lt * (s.push ?? .03)); else   // cover: full-bleed photo (a phone photo opener), slow push
+    g.drawImage(im, W / 2 - im.width * z / 2 + (s.dx || 0), H / 2 - im.height * z / 2 + (s.dy || 0), im.width * z, im.height * z);
+    if (s.word) word(s.word, s.wx || W / 2, s.wy || H * .14, s.size || 64, s.ink, FONT, Math.min(1, lt * 8)); },
+};
+const IMG = {}, SEQ = new Map();
+const loadImg = (src) => new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => no(new Error("image " + src)); im.src = src; });
+// seq: {src: ".../shot_%04d.jpg", count, fps, at, start}. Holds the first frame before `at` and the last after the end.
+async function seqImg(q, lt) { const i = Math.min(q.count - 1, Math.max(0, Math.floor((lt - (q.at || 0)) * (q.fps || 30) + 1e-3))), u = q.src.replace("%04d", String(i + (q.start || 0)).padStart(4, "0"));
+  if (!SEQ.has(u)) { if (SEQ.size > 24) SEQ.delete(SEQ.keys().next().value); SEQ.set(u, await loadImg(u)); } return SEQ.get(u); }
+let PLAN, FONT = "-apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif";
+window.ready = (async () => {
+  PLAN = (await import(new URLSearchParams(location.search).get("plan"))).default;
+  await Promise.all(Object.entries(PLAN.images || {}).map(([k, src]) => new Promise((ok, no) => {
+    const im = new Image(); im.onload = () => ok(IMG[k] = im); im.onerror = no; im.src = src; })));
+  for (const [name, src] of Object.entries(PLAN.fonts || {})) { const o = typeof src === "string" ? { src } : src;   // {src, weight: "100 900"} for a variable face
+    document.fonts.add(await new FontFace(name, `url("${o.src}")`, o.weight ? { weight: o.weight } : {}).load()); }
+  [W, H] = PLAN.frame || [W, H]; SC = PLAN.scale || 1; c.width = Math.round(W * SC); c.height = Math.round(H * SC);
+  FONT = PLAN.font || FONT;
+  return PLAN;
+})();
+// Hard cuts only between scenes; each scene gets local time lt.
+window.render = async (t) => { let t0 = 0; g.setTransform(SC, 0, 0, SC, 0, 0);
+  for (const s of PLAN.scenes) { if (t < t0 + s.dur) { if (s.seq) s._img = await seqImg(s.seq, t - t0); SCENES[s.type](s, t - t0); break; } t0 += s.dur; }
+  if (PLAN.captions) captions(PLAN.captions, t);
+  if (PLAN.grain) addGrain(t); };   // film grain is opt-in (grain: true)
+</script>
