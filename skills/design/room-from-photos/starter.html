@@ -89,7 +89,18 @@ header .sub{font-size:12.5px;color:var(--ink-2)}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:#fff;font-size:12.5px;padding:7px 12px;border-radius:2px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:5}
 .toast.on{opacity:1}
 dialog{border:1px solid var(--rule);border-radius:2px;padding:14px;max-width:min(560px,92vw)}
+dialog::backdrop{background:rgba(20,20,20,.25)}
 dialog textarea{width:min(520px,84vw);height:200px;font:12px var(--mono);border:1px solid var(--rule);padding:8px}
+.lib{width:min(680px,94vw);max-width:none;max-height:86vh;padding:0;overflow:auto;overscroll-behavior:contain}
+.libh{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px 10px 16px;border-bottom:1px solid var(--rule);position:sticky;top:0;background:var(--paper);z-index:1}
+.libh h2{font-size:15px;font-weight:600;margin:0;letter-spacing:-.01em}
+.lib .grp{padding:4px 16px 14px}
+.lib h3{font-size:11px;font-family:var(--mono);font-weight:400;color:var(--ink-3);margin:8px 0 6px}
+.ents{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}
+.ents button{height:auto;padding:0 0 6px;display:flex;flex-direction:column;align-items:stretch;text-align:left;overflow:hidden;min-width:0}
+.ents img{width:100%;aspect-ratio:4/3;object-fit:contain;display:block;background:#f6f6f6}
+.ents span{font-size:12px;padding:5px 7px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ents small{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);padding:1px 7px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .panetoggle{display:none}
 @media (max-width:760px){
   .app{height:auto;display:block}
@@ -130,6 +141,7 @@ dialog textarea{width:min(520px,84vw);height:200px;font:12px var(--mono);border:
 </div>
 <div class="toast" id="toast"></div>
 <dialog id="dlg"><p>Copy this and paste it back to Claude:</p><textarea id="dlgT" readonly></textarea><div class="row"><button id="dlgX">Close</button></div></dialog>
+<dialog id="lib" class="lib" aria-label="Add a piece"><div class="libh"><h2>Add a piece</h2><button id="libX">Close</button></div><div id="libBody"></div></dialog>
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.162.0/+esm';
 import {RoomEnvironment} from 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/environments/RoomEnvironment.js/+esm';
@@ -195,6 +207,15 @@ var CONFIG = {
     stand:   {name: 'Nightstand', type: 'nightstand', w: 16, d: 16, h: 22, color: 0xc9a24f},
     rug:     {name: 'Rug', type: 'rug', w: 60, d: 84, color: 0xe9dfcc, color2: 0x9db2c4}
   },
+  /* Optional: pieces this room's "Add a piece" library offers on top of the built-in catalogue (sofas, tables, storage, beds, rugs, lamps,
+     plants, a TV, art). Each is an item spec with an id and a name; variants work as on ITEMS. group files it under a catalogue group
+     (seating, tables, storage, beds, lighting, plants, rugs, walls); without one it is listed first as "For this room". A piece added
+     from the library gets quiet colours from PALETTE, and "Copy layout for Claude" returns its spec under `added`.
+     {base: false, entries: [...]} offers only these and hides the catalogue. */
+  LIBRARY: [
+    {id: 'toys', name: 'Toy chest', type: 'box', w: 36, d: 18, h: 20},
+    {id: 'reading', name: 'Reading chair', type: 'armchair', w: 28, d: 30, h: 30, group: 'seating'}
+  ],
   /* place: id → [x, y, rot]. x, y = the item's centre; rot = the wall its back faces: 0 top, 90 right, 180 bottom, 270 left (any angle works).
      colors (optional): this option's own palette: walls, floor, trim, paneling, or an item or built-in id → colour or [colour, colour2].
      variants (optional): item id → the variant's label or index. */
@@ -289,21 +310,22 @@ var TYPES = {bed: {side: 20}, crib: {side: 0}, dresser: {front: 36}, wardrobe: {
   sofa: {front: 14}, armchair: {front: 16}, lounge: {front: 16}, floorlamp: {}, floorplant: {}, art: {}, nightstand: {}, chair: {}, table: {}, rug: {}, box: {}, media: {}, ottoman: {}, stands: {}, petbed: {}, fireplace: {}};
 /* a piece's variants swap its size or type per option (the configurator's "style"); the first is the piece as given */
 var BASEIT = C.ITEMS;
-function vIndex(k, v){ var vs = BASEIT[k] && BASEIT[k].variants; if (!vs) return 0; if (typeof v === 'string'){ for (var i = 0; i < vs.length; i++) if (vs[i].label === v) return i; return 0; } return Math.max(0, Math.min(vs.length - 1, v || 0)); }
-function itemsFor(L){ var out = {}; Object.keys(BASEIT).forEach(function(k){ var b = BASEIT[k], v = b.variants ? b.variants[vIndex(k, L && L.variants && L.variants[k])] : null, it = {}, key;
-    for (key in b) if (key !== 'variants') it[key] = b[key]; if (v) for (key in v) if (key !== 'label') it[key] = v[key];
-    var t = TYPES[it.type] || {}; it.id = k; if (it.d == null) it.d = it.w; if (it.front == null) it.front = t.front || 0; if (it.side == null) it.side = t.side || 0; it.floor = it.type === 'rug' || !!it.mount; if (it.h == null) it.h = it.floor ? 0.5 : 30;
-    if (it.type === 'media' && it.tv && it.hb == null) it.hb = it.h + 3 + it.tv * 0.49; if (it.type === 'bed' && it.hb == null) it.hb = 36; out[k] = it; }); return out; }   /* hb: a headboard or TV the window check sees */
+function specOf(k, L){ var l = L || LAYOUTS && LAYOUTS[cur]; return BASEIT[k] || (l && l.added || {})[k]; }   /* a piece's spec: configured, or added from the library in that option */
+function vIndex(k, v, L){ var b = specOf(k, L), vs = b && b.variants; if (!vs) return 0; if (typeof v === 'string'){ for (var i = 0; i < vs.length; i++) if (vs[i].label === v) return i; return 0; } return Math.max(0, Math.min(vs.length - 1, v || 0)); }
+function normItem(k, b, v){ var it = {}, key; for (key in b) if (key !== 'variants') it[key] = b[key]; if (v) for (key in v) if (key !== 'label') it[key] = v[key];
+  var t = TYPES[it.type] || {}; it.id = k; if (it.d == null) it.d = it.w; if (it.front == null) it.front = t.front || 0; if (it.side == null) it.side = t.side || 0; it.floor = it.type === 'rug' || !!it.mount; if (it.h == null) it.h = it.floor ? 0.5 : 30;
+  if (it.type === 'media' && it.tv && it.hb == null) it.hb = it.h + 3 + it.tv * 0.49; if (it.type === 'bed' && it.hb == null) it.hb = 36; return it; }   /* hb: a headboard or TV the window check sees */
+function itemsFor(L){ var out = {}, src = Object.assign({}, BASEIT, L && L.added); Object.keys(src).forEach(function(k){ var b = src[k]; out[k] = normItem(k, b, b.variants ? b.variants[vIndex(k, L && L.variants && L.variants[k], L)] : null); }); return out; }
 function normCols(o){ var cols = {}; Object.keys(o || {}).forEach(function(k){ var v = o[k]; cols[k] = Array.isArray(v) ? v.map(hex) : hex(v); }); return cols; }
 function normVars(o){ var vs = {}; Object.keys(o || {}).forEach(function(k){ if (BASEIT[k]) vs[k] = vIndex(k, o[k]); }); return vs; }
-var BASE = C.LAYOUTS.map(function(L){ return {name: L.name, note: L.note || '', place: clone(L.place), colors: normCols(L.colors), variants: normVars(L.variants)}; });
+var BASE = C.LAYOUTS.map(function(L){ return {name: L.name, note: L.note || '', place: clone(L.place), colors: normCols(L.colors), variants: normVars(L.variants), added: {}}; });
 var LAYOUTS = BASE.map(clone);
 var store = (function(){ try { return JSON.parse(localStorage.getItem(C.storageKey)) || {}; } catch (e){ return {}; } })();
 (store.extra || []).forEach(function(L){ LAYOUTS.push(L); });
-Object.keys(store.edits || {}).forEach(function(i){ var e = store.edits[i]; if (!LAYOUTS[i]) return; if (e.place){ LAYOUTS[i].place = e.place; LAYOUTS[i].colors = e.colors || {}; LAYOUTS[i].variants = e.variants || {}; } else LAYOUTS[i].place = e; });
-LAYOUTS.forEach(function(L){ if (!L.colors) L.colors = {}; if (!L.variants) L.variants = {}; Object.keys(L.place).forEach(function(k){ if (!BASEIT[k]) delete L.place[k]; }); });
+Object.keys(store.edits || {}).forEach(function(i){ var e = store.edits[i]; if (!LAYOUTS[i]) return; if (e.place){ LAYOUTS[i].place = e.place; LAYOUTS[i].colors = e.colors || {}; LAYOUTS[i].variants = e.variants || {}; LAYOUTS[i].added = e.added || {}; } else LAYOUTS[i].place = e; });
+LAYOUTS.forEach(function(L){ if (!L.colors) L.colors = {}; if (!L.variants) L.variants = {}; if (!L.added) L.added = {}; Object.keys(L.place).forEach(function(k){ if (!BASEIT[k] && !L.added[k]) delete L.place[k]; }); });
 function save(){ try { var ed = {}, same = function(a, b){ return JSON.stringify(a) === JSON.stringify(b); };
-  LAYOUTS.forEach(function(L, i){ if (i < BASE.length && !(same(L.place, BASE[i].place) && same(L.colors, BASE[i].colors) && same(L.variants, BASE[i].variants))) ed[i] = {place: L.place, colors: L.colors, variants: L.variants}; });
+  LAYOUTS.forEach(function(L, i){ if (i < BASE.length && !(same(L.place, BASE[i].place) && same(L.colors, BASE[i].colors) && same(L.variants, BASE[i].variants) && same(L.added, BASE[i].added))){ ed[i] = {place: L.place, colors: L.colors, variants: L.variants}; if (Object.keys(L.added).length) ed[i].added = L.added; } });
   localStorage.setItem(C.storageKey, JSON.stringify({edits: ed, extra: LAYOUTS.slice(BASE.length)})); } catch (e){} }
 function saveSoon(){ clearTimeout(saveSoon.t); saveSoon.t = setTimeout(save, 300); }
 var cur = Math.max(0, Math.min(LAYOUTS.length - 1, (parseInt(HASH.layout, 10) || 1) - 1)), sel = null, ITEMS = itemsFor(LAYOUTS[cur]);
@@ -1070,16 +1092,32 @@ function moveTo(k, x, y, snap){ var q = place()[k]; x = Math.round(x * 2) / 2; y
   if (snap){ var bb = bboxOf(itemPoly(k, [x, y, q[2]])); x += snapAxis(bb, 0); y += snapAxis(bb, 1); } if (q[0] === x && q[1] === y) return; q[0] = x; q[1] = y; changed(k); }
 function turn(k, deg){ var q = place()[k]; q[2] = (((q[2] || 0) + deg) % 360 + 360) % 360; changed(k); renderInsp(); }
 function turnTo(k, deg){ var q = place()[k], r = ((deg % 360) + 360) % 360; if ((q[2] || 0) === r) return; q[2] = r; changed(k); }
-function remove(k){ delete place()[k]; if (OBJ[k]){ FURN.remove(OBJ[k]); dispose(OBJ[k]); delete OBJ[k]; } sel = null; attachGizmo(); changed(k); renderInsp(); }
-function addItem(k){ var o = EVAL[cur].open, it = ITEMS[k]; place()[k] = [Math.round(o.size ? o.x + o.size / 2 : RC[0]), Math.round(o.size ? o.y + o.size / 2 : RC[1]), 0];
-  makeObj(k); changed(k); select(k); renderInsp(); }
+function remove(k){ var L = LAYOUTS[cur]; delete L.place[k]; if (L.added[k]){ delete L.added[k]; delete L.colors[k]; delete L.variants[k]; ITEMS = itemsFor(L); }   /* a library piece leaves for good; a configured one waits in the library under "In this room" */
+  if (OBJ[k]){ FURN.remove(OBJ[k]); dispose(OBJ[k]); delete OBJ[k]; } sel = null; attachGizmo(); changed(k); renderInsp(); }
+function spotFor(it){ /* a clear spot: the centre of the biggest open square, else the middle of the view; a wall piece goes to the nearest wall, clear of its openings */
+  var o = EVAL[cur].open, c = o.size ? [o.x + o.size / 2, o.y + o.size / 2] : [Math.max(RB[0], Math.min(RB[2], view.tx)), Math.max(RB[1], Math.min(RB[3], view.tz))];
+  if (!it.mount) return [Math.round(c[0]), Math.round(c[1]), 0];
+  var best = null; WALLS.forEach(function(w){ var t = Math.max(it.w / 2, Math.min(w.L - it.w / 2, dot(sub(c, w.a), w.d))), dn = Math.abs(dot(sub(c, w.a), w.n)); if (!best || dn < best.dn) best = {w: w, t: t, dn: dn}; });
+  var w = best.w, ops = OPEN.filter(function(op){ return op.w === w; }), t = best.t, tries = [0]; for (var s = 6; s < w.L; s += 6) tries.push(s, -s);
+  for (var i = 0; i < tries.length; i++){ var tt = t + tries[i]; if (tt - it.w / 2 < 0 || tt + it.w / 2 > w.L) continue; if (!ops.some(function(op){ return tt + it.w / 2 > op.s0 && tt - it.w / 2 < op.s1; })){ t = tt; break; } }
+  var p = add(add(w.a, mul(w.d, t)), mul(w.n, -it.d / 2)); return [Math.round(p[0] * 2) / 2, Math.round(p[1] * 2) / 2, (Math.round(Math.atan2(w.n[0], -w.n[1]) * 180 / Math.PI) + 360) % 360]; }
+function addItem(k){ place()[k] = spotFor(ITEMS[k]); makeObj(k); changed(k); select(k); renderInsp(); }
+function quiet(kinds){ /* the palette's quietest swatch for a finish: low saturation, light but not white; the first group that has swatches decides */
+  var list = (kinds || []).map(function(g){ return PALG[g] || []; }).filter(function(l){ return l.length; })[0] || swatchesFor(kinds), best = null, bs = 9;
+  list.forEach(function(p){ var h = hex(p[1]), r = h >> 16 & 255, g = h >> 8 & 255, b = h & 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), sc = (mx ? (mx - mn) / mx : 0) * 2 + Math.abs((mx + mn) / 510 - 0.75);
+    if (sc < bs){ bs = sc; best = h; } }); return best; }
+function quietSpec(s){ var q; if (s.color == null && (q = quiet(kindsOf(s.type, 0))) != null) s.color = q; if (s.color2 == null && SECOND[s.type] && (q = quiet(kindsOf(s.type, 1))) != null) s.color2 = q; return s; }
+function addPiece(e){ /* a library entry becomes this option's own item, under an id of its own, in the room's quiet colours */
+  var L = LAYOUTS[cur], k = e.id || e.type, n = 2, s = {}, key; while (BASEIT[k] || L.added[k]) k = (e.id || e.type) + '-' + n++;
+  for (key in e) if (key !== 'id' && key !== 'group') s[key] = e[key]; s.lib = e.id; s.new = true; quietSpec(s);
+  L.added[k] = s; ITEMS = itemsFor(L); addItem(k); return k; }
 function setLayout(i){ cur = i; ITEMS = itemsFor(LAYOUTS[i]); sel = null; buildItems(); paintRoom(); EVAL[cur] = evaluate(LAYOUTS[cur]); planDirty = dirty3 = uiDirty = true; renderTabs(); renderInsp(); renderRoom(); }
 var pdrag = null;
 pc.addEventListener('pointerdown', function(e){ var p = toPlan(e), k = hitItem(p); select(k); if (!k) return; var q = place()[k]; pdrag = {k: k, off: [p[0] - q[0], p[1] - q[1]]}; pc.setPointerCapture(e.pointerId); pc.style.cursor = 'grabbing'; });
 pc.addEventListener('pointermove', function(e){ var p = toPlan(e); if (pdrag) moveTo(pdrag.k, p[0] - pdrag.off[0], p[1] - pdrag.off[1], !e.altKey); else if (e.pointerType === 'mouse') pc.style.cursor = hitItem(p) ? 'grab' : 'default'; });
 function endP(){ pdrag = null; pc.style.cursor = 'default'; } pc.addEventListener('pointerup', endP); pc.addEventListener('pointercancel', endP);
 pc.addEventListener('dblclick', function(e){ var k = hitItem(toPlan(e)); if (k) turn(k, 90); });
-window.addEventListener('keydown', function(e){ if (/INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+window.addEventListener('keydown', function(e){ if (/INPUT|TEXTAREA/.test(document.activeElement.tagName) || $('#lib').open) return;
   if (e.key === 'Escape'){ if (mode === 'photo') exitPhoto(); else select(null); return; }
   if (/^[1-9]$/.test(e.key) && LAYOUTS[+e.key - 1]){ setLayout(+e.key - 1); return; }
   if (!sel || !place()[sel]) return; var q = place()[sel], st = e.shiftKey ? 12 : 1;
@@ -1099,15 +1137,15 @@ function refreshPanel(){ var L = LAYOUTS[cur], ev = EVAL[cur]; $('#optH').textCo
   $('#metric').textContent = 'Open floor ' + Math.round(ev.open.area) + ' sq ft · biggest clear square ' + fmt(ev.open.size);
   var tray = $('#tray'), ks = Object.keys(ITEMS); tray.textContent = '';
   ks.filter(function(k){ return L.place[k]; }).forEach(function(k){ var b = el('button', k === sel ? 'on' : '', ITEMS[k].name); b.onclick = function(){ select(k === sel ? null : k); }; tray.appendChild(b); });
-  ks.filter(function(k){ return !L.place[k]; }).forEach(function(k){ var b = el('button', 'add', '+ ' + ITEMS[k].name); b.onclick = function(){ addItem(k); }; tray.appendChild(b); });
+  var ab = el('button', 'add', '+ Add a piece'); ab.onclick = openLib; tray.appendChild(ab);   /* the library: the catalogue, and this option's pieces taken out */
   renderTabs(); updateGaps(); }
 var GAPF = [['left', 'From left wall'], ['right', 'From right wall'], ['top', 'From top wall'], ['bottom', 'From bottom wall']];
 function renderInsp(){ var box = $('#insp'); box.textContent = '';
   if (!sel || !place()[sel]){ box.appendChild(el('h2', '', 'Move things')); box.appendChild(el('p', 'hint', 'Drag furniture in the plan or the model. Pick a piece in the model for arrows that slide it and a ring that turns it. R or double-click turns it too; arrow keys nudge an inch, shift-arrows a foot; Alt drags without snapping to walls.')); return; }
   var it = ITEMS[sel], q = place()[sel], h = el('div', 'nm', it.name); if (it.new) h.appendChild(el('span', 'new', 'new'));
   box.appendChild(el('h2', '', 'Selected')); box.appendChild(h); box.appendChild(el('div', 'sz', fmt(it.w) + ' wide × ' + fmt(it.d) + ' deep' + (it.floor ? '' : ' × ' + fmt(Math.max(it.h, it.hb || 0)) + ' high')));
-  var vs = BASEIT[sel].variants, k0 = sel; if (vs){ box.appendChild(el('h3', '', 'Style')); var vb = el('div', 'vars'), vi = vIndex(sel, LAYOUTS[cur].variants[sel]);
-    vs.forEach(function(v, i){ var w = v.w || BASEIT[k0].w, d = v.d || BASEIT[k0].d, b = el('button', i === vi ? 'on' : '', v.label); b.appendChild(el('small', '', fmt(w) + ' × ' + fmt(d))); b.onclick = function(){ setVariant(k0, i); }; vb.appendChild(b); }); box.appendChild(vb); }
+  var b0 = specOf(sel), vs = b0.variants, k0 = sel; if (vs){ box.appendChild(el('h3', '', 'Style')); var vb = el('div', 'vars'), vi = vIndex(sel, LAYOUTS[cur].variants[sel]);
+    vs.forEach(function(v, i){ var w = v.w || b0.w, d = v.d || b0.d, b = el('button', i === vi ? 'on' : '', v.label); b.appendChild(el('small', '', fmt(w) + ' × ' + fmt(d))); b.onclick = function(){ setVariant(k0, i); }; vb.appendChild(b); }); box.appendChild(vb); }
   box.appendChild(el('h3', '', 'Colour')); var cs = itemColors(sel);
   box.appendChild(swatchRow(MAIN[it.type] || 'Finish', cs[0], swatchesFor(kindsOf(it.type, 0)), function(h, live){ setItemColor(k0, 0, h, live); }));
   if (SECOND[it.type]) box.appendChild(swatchRow(SECOND[it.type], cs[1], swatchesFor(kindsOf(it.type, 1)), function(h, live){ setItemColor(k0, 1, h, live); }));
@@ -1159,14 +1197,78 @@ function toast(t){ var e = $('#toast'); e.textContent = t; e.classList.add('on')
 function copyText(t, msg){ var fall = function(){ $('#dlgT').value = t; $('#dlg').showModal(); $('#dlgT').select(); };
   try { navigator.clipboard.writeText(t).then(function(){ toast(msg); }, fall); } catch (e){ fall(); } }
 $('#dlgX').onclick = function(){ $('#dlg').close(); };
-$('#copy').onclick = function(){ var L = LAYOUTS[cur], p = {}; Object.keys(L.place).forEach(function(k){ p[k] = L.place[k].map(function(v){ return Math.round(v * 2) / 2; }); });
+function layoutJSON(){ /* the option as Claude pastes it back: place and colours, variants by label, and each library piece's full spec under added */
+  var L = LAYOUTS[cur], p = {}; Object.keys(L.place).forEach(function(k){ p[k] = L.place[k].map(function(v){ return Math.round(v * 2) / 2; }); });
   var out = {option: letter(cur), name: L.name, place: p}, cols = Object.keys(L.colors);
   if (cols.length){ out.colors = {}; cols.forEach(function(k){ var v = L.colors[k]; out.colors[k] = Array.isArray(v) ? v.map(css) : css(v); }); }
-  var vk = Object.keys(L.variants || {}); if (vk.length){ out.variants = {}; vk.forEach(function(k){ out.variants[k] = BASEIT[k].variants[L.variants[k]].label; }); }
-  copyText(JSON.stringify(out), 'Layout copied: paste it to Claude'); };
-$('#dup').onclick = function(){ var L = LAYOUTS[cur]; LAYOUTS.push({name: L.name + ', edited', note: 'Your edit of option ' + letter(cur) + '.', place: clone(L.place), colors: clone(L.colors), variants: clone(L.variants)}); EVAL.push(evaluate(LAYOUTS[LAYOUTS.length - 1])); save(); setLayout(LAYOUTS.length - 1); };
-$('#reset').onclick = function(){ if (cur < BASE.length){ LAYOUTS[cur].place = clone(BASE[cur].place); LAYOUTS[cur].colors = clone(BASE[cur].colors); LAYOUTS[cur].variants = clone(BASE[cur].variants); } else { LAYOUTS.splice(cur, 1); EVAL.splice(cur, 1); cur = Math.max(0, cur - 1); } save(); setLayout(cur); };
+  var vk = Object.keys(L.variants || {}); if (vk.length){ out.variants = {}; vk.forEach(function(k){ var vs = specOf(k).variants; if (vs && vs[L.variants[k]]) out.variants[k] = vs[L.variants[k]].label; }); }
+  var ak = Object.keys(L.added); if (ak.length){ out.added = {}; ak.forEach(function(k){ var s = clone(L.added[k]); ['color', 'color2'].forEach(function(c){ if (s[c] != null) s[c] = css(hex(s[c])); }); out.added[k] = s; }); }
+  return JSON.stringify(out); }
+$('#copy').onclick = function(){ copyText(layoutJSON(), 'Layout copied: paste it to Claude'); };
+$('#dup').onclick = function(){ var L = LAYOUTS[cur]; LAYOUTS.push({name: L.name + ', edited', note: 'Your edit of option ' + letter(cur) + '.', place: clone(L.place), colors: clone(L.colors), variants: clone(L.variants), added: clone(L.added)}); EVAL.push(evaluate(LAYOUTS[LAYOUTS.length - 1])); save(); setLayout(LAYOUTS.length - 1); };
+$('#reset').onclick = function(){ if (cur < BASE.length){ LAYOUTS[cur].place = clone(BASE[cur].place); LAYOUTS[cur].colors = clone(BASE[cur].colors); LAYOUTS[cur].variants = clone(BASE[cur].variants); LAYOUTS[cur].added = {}; } else { LAYOUTS.splice(cur, 1); EVAL.splice(cur, 1); cur = Math.max(0, cur - 1); } save(); setLayout(cur); };
 $('#paneToggle').onclick = function(e){ var p = e.target.dataset.p; if (!p) return; document.body.className = 'm-' + p; [].forEach.call(this.children, function(b){ b.classList.toggle('on', b.dataset.p === p); }); };
+
+/* ---------- the library: a catalogue of pieces in common sizes, plus the room's own; each thumbnail is the engine's own render of the builder ---------- */
+var LIB_GROUPS = [['room', 'In this room'], ['here', 'For this room'], ['seating', 'Seating'], ['tables', 'Tables'], ['storage', 'Storage'], ['beds', 'Beds'], ['lighting', 'Lighting'], ['plants', 'Plants'], ['rugs', 'Rugs'], ['walls', 'Walls and decor']];
+var LIB_BASE = [
+  {id: 'sofa3', group: 'seating', name: 'Three-seat sofa', type: 'sofa', w: 84, d: 36, h: 33}, {id: 'loveseat', group: 'seating', name: 'Loveseat', type: 'sofa', w: 60, d: 34, h: 33},
+  {id: 'armchair', group: 'seating', name: 'Armchair', type: 'armchair', w: 32, d: 34, h: 32}, {id: 'lounge', group: 'seating', name: 'Lounge chair', type: 'lounge', w: 27, d: 32, h: 39},
+  {id: 'chair', group: 'seating', name: 'Dining chair', type: 'chair', w: 18, d: 18, h: 34}, {id: 'ottoman', group: 'seating', name: 'Ottoman', type: 'ottoman', w: 30, d: 20, h: 17},
+  {id: 'coffee', group: 'tables', name: 'Coffee table', type: 'table', w: 48, d: 24, h: 18}, {id: 'coffee-round', group: 'tables', name: 'Round coffee table', type: 'table', w: 36, h: 18, round: true},
+  {id: 'coffee-glass', group: 'tables', name: 'Glass coffee table', type: 'table', w: 44, d: 24, h: 18, glass: true, shelf: true}, {id: 'side', group: 'tables', name: 'Side table', type: 'table', w: 20, d: 20, h: 24},
+  {id: 'media', group: 'storage', name: 'Media console', type: 'media', w: 60, d: 18, h: 24, tv: 55}, {id: 'bookshelf', group: 'storage', name: 'Bookshelf', type: 'bookshelf', w: 36, d: 12, h: 72},
+  {id: 'dresser', group: 'storage', name: 'Dresser', type: 'dresser', w: 60, d: 20, h: 34}, {id: 'nightstand', group: 'storage', name: 'Nightstand', type: 'nightstand', w: 20, d: 18, h: 24},
+  {id: 'wardrobe', group: 'storage', name: 'Wardrobe', type: 'wardrobe', w: 40, d: 24, h: 72}, {id: 'desk', group: 'storage', name: 'Desk', type: 'desk', w: 48, d: 24, h: 29},
+  {id: 'twin', group: 'beds', name: 'Twin bed', type: 'bed', w: 38, d: 75, h: 22, hb: 40}, {id: 'full', group: 'beds', name: 'Full bed', type: 'bed', w: 54, d: 75, h: 22, hb: 42},
+  {id: 'queen', group: 'beds', name: 'Queen bed', type: 'bed', w: 60, d: 80, h: 22, hb: 44}, {id: 'king', group: 'beds', name: 'King bed', type: 'bed', w: 76, d: 80, h: 22, hb: 46},
+  {id: 'crib', group: 'beds', name: 'Crib', type: 'crib', w: 28, d: 52, h: 40},
+  {id: 'tripod', group: 'lighting', name: 'Tripod floor lamp', type: 'floorlamp', w: 20, d: 20, h: 60, shade: 9}, {id: 'arc', group: 'lighting', name: 'Arc lamp', type: 'floorlamp', w: 14, d: 14, h: 72, arc: 30, shade: 9},
+  {id: 'tree', group: 'plants', name: 'Tree', type: 'floorplant', w: 16, d: 16, h: 72, heads: 3}, {id: 'snake', group: 'plants', name: 'Snake plant', type: 'floorplant', w: 12, d: 12, h: 40, upright: true},
+  {id: 'climber', group: 'plants', name: 'Climber on a pole', type: 'floorplant', w: 12, d: 12, h: 54, pole: true},
+  {id: 'rug5x8', group: 'rugs', name: 'Rug 5 × 8', type: 'rug', w: 96, d: 60}, {id: 'rug8x10', group: 'rugs', name: 'Rug 8 × 10', type: 'rug', w: 120, d: 96}, {id: 'rug9x12', group: 'rugs', name: 'Rug 9 × 12', type: 'rug', w: 144, d: 108},
+  {id: 'petbed', group: 'walls', name: 'Pet bed', type: 'petbed', w: 30, d: 24, h: 8}, {id: 'walltv', group: 'walls', name: 'Wall TV', type: 'media', w: 48, d: 3, h: 27, tv: 55, mount: 58},
+  {id: 'art', group: 'walls', name: 'Art', type: 'art', w: 24, d: 1.5, h: 30, mount: 54, print: 'abstract'}
+];
+var LIB = (function(){ var c = C.LIBRARY, own = Array.isArray(c) ? c : c && c.entries || [];   /* the room's own entries first; {base: false} drops the catalogue */
+  return own.map(function(e){ var o = {}; for (var k in e) o[k] = e[k]; if (!o.group) o.group = 'here'; if (!o.id) o.id = o.type; return o; }).concat(c && c.base === false ? [] : LIB_BASE); })();
+function libEntries(){ var L = LAYOUTS[cur]; return Object.keys(BASEIT).filter(function(k){ return !L.place[k]; }).map(function(k){ return {id: k, group: 'room', room: true}; }).concat(LIB); }   /* the option's pieces taken out, then the catalogue */
+function libSize(it){ var a = it.mount ? [it.w, it.h] : [it.w, it.d]; return fmt(a[0]) + ' × ' + fmt(a[1]); }
+function renderLib(){ var box = $('#libBody'), ents = libEntries(); box.textContent = '';
+  LIB_GROUPS.forEach(function(gr){ var list = ents.filter(function(e){ return e.group === gr[0]; }); if (!list.length) return;
+    var sec = el('div', 'grp'), grid = el('div', 'ents'); sec.appendChild(el('h3', '', gr[1]));
+    list.forEach(function(e){ var it = e.room ? ITEMS[e.id] : quietSpec(normItem(e.id, e, null)), cs = e.room ? itemColors(e.id) : colorsOf('', it), b = el('button'), im = el('img'); im.alt = '';
+      b.appendChild(im); b.appendChild(el('span', '', it.name)); b.appendChild(el('small', '', libSize(it)));
+      b.title = it.name + ': ' + fmt(it.w) + ' wide × ' + fmt(it.d) + ' deep' + (it.floor && !it.mount ? '' : ' × ' + fmt(Math.max(it.h, it.hb || 0)) + ' high');
+      b.onclick = function(){ closeLib(); if (e.room) addItem(e.id); else addPiece(e); };
+      thumb(it, cs, function(url){ im.src = url; }); grid.appendChild(b); });
+    sec.appendChild(grid); box.appendChild(sec); }); }
+function openLib(){ renderLib(); $('#lib').showModal(); }
+function closeLib(){ if ($('#lib').open) $('#lib').close(); THUMB.q.length = 0; }
+$('#libX').onclick = closeLib; $('#lib').addEventListener('close', function(){ THUMB.q.length = 0; });
+/* thumbnails: the piece built and painted as it would land, rendered small by a second renderer (a render target would skip tone mapping), cached as an image */
+var THUMB = {cache: {}, q: [], on: false, W: 208, H: 156}, TR = null;
+function thumb(it, cs, cb){ var key = JSON.stringify([it, cs]); if (THUMB.cache[key]) return cb(THUMB.cache[key]); if (THUMB.off || (HASH.debug && HASH.nothumb)) return;
+  THUMB.q.push({it: it, cs: cs, key: key, cb: cb}); if (!THUMB.on){ THUMB.on = true; requestAnimationFrame(thumbTick); } }   /* nothumb: headless captures of the library beside the model at phone width */
+function thumbTick(){ var t0 = performance.now(); while (THUMB.q.length && performance.now() - t0 < 12){ var j = THUMB.q.shift();   /* a few per frame, so the dialog opens at once */
+    try { j.cb(THUMB.cache[j.key] || (THUMB.cache[j.key] = renderThumb(j.it, j.cs))); } catch (e){ THUMB.off = true; THUMB.q.length = 0; } }   /* no second context (too many, or lost): the names and sizes still serve */
+  if (THUMB.q.length) requestAnimationFrame(thumbTick); else THUMB.on = false; }
+function thumbRig(){ if (TR) return TR; var c = document.createElement('canvas'), r = new T.WebGLRenderer({canvas: c, antialias: true, alpha: true, preserveDrawingBuffer: true});
+  r.setPixelRatio(1); r.setSize(THUMB.W, THUMB.H, false); r.setClearColor(0xffffff, 0); r.toneMapping = T.NeutralToneMapping; r.shadowMap.enabled = true; r.shadowMap.type = T.PCFSoftShadowMap;
+  var sc = new T.Scene(), pm = new T.PMREMGenerator(r); sc.environment = pm.fromScene(new RoomEnvironment(r), 0.04).texture; pm.dispose();
+  var l = new T.DirectionalLight(0xfff3e3, 2.8); l.castShadow = true; l.shadow.mapSize.set(512, 512); l.shadow.bias = -0.001; l.shadow.normalBias = 0.5; l.shadow.radius = 4; sc.add(l); sc.add(l.target);
+  var gm = new T.Mesh(new T.PlaneGeometry(800, 800), new T.ShadowMaterial({opacity: 0.14})); gm.rotation.x = -Math.PI / 2; gm.receiveShadow = true; sc.add(gm);
+  return TR = {r: r, c: c, sc: sc, l: l, gm: gm, cam: new T.PerspectiveCamera(26, THUMB.W / THUMB.H, 1, 4000)}; }
+function renderThumb(it, cs){ var R = thumbRig(), g = build(it), l0 = LOOK; LOOK = 'colour'; paintGroup(g, cs, WHITE, false, it.type); LOOK = l0;   /* painted as in the colour model, whatever look is on */
+  R.sc.add(g); g.updateMatrixWorld(true); var box = new T.Box3().setFromObject(g), c = box.getCenter(V(0, 0, 0)), sz = box.getSize(V(0, 0, 0)), rad = sz.length() / 2, pts = [];
+  for (var i = 0; i < 8; i++) pts.push(V(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z));
+  var el0 = (it.type === 'rug' ? 52 : 24) * Math.PI / 180, az = 34 * Math.PI / 180, dir = V(-Math.sin(az) * Math.cos(el0), Math.sin(el0), Math.cos(az) * Math.cos(el0)), D = rad * 5, cam = R.cam;   /* from the front left, a little above; rugs from higher */
+  for (var n = 0; n < 3; n++){ cam.position.copy(c).addScaledVector(dir, D); cam.lookAt(c); cam.near = Math.max(0.5, D - rad * 2); cam.far = D + rad * 2; cam.updateProjectionMatrix(); cam.updateMatrixWorld(true);   /* fit like the model view: project the corners, recentre, rescale */
+    var lo = [1e9, 1e9], hi = [-1e9, -1e9]; pts.forEach(function(p){ var q = p.clone().project(cam); lo[0] = Math.min(lo[0], q.x); lo[1] = Math.min(lo[1], q.y); hi[0] = Math.max(hi[0], q.x); hi[1] = Math.max(hi[1], q.y); });
+    var rt = V(0, 0, 0).setFromMatrixColumn(cam.matrixWorld, 0), up = V(0, 0, 0).setFromMatrixColumn(cam.matrixWorld, 1), t = Math.tan(cam.fov * Math.PI / 360) * D;
+    c.addScaledVector(rt, (lo[0] + hi[0]) / 2 * t * cam.aspect).addScaledVector(up, (lo[1] + hi[1]) / 2 * t); D *= Math.max((hi[0] - lo[0]) / 2, (hi[1] - lo[1]) / 2) / 0.84; }
+  R.l.position.set(c.x - rad * 2, c.y + rad * 3.2, c.z + rad * 1.5); R.l.target.position.copy(c); var s = R.l.shadow.camera; s.left = s.bottom = -rad * 1.6; s.right = s.top = rad * 1.6; s.near = 1; s.far = rad * 8; s.updateProjectionMatrix();
+  R.gm.visible = !it.mount; R.r.render(R.sc, cam); var url = R.c.toDataURL('image/png'); R.sc.remove(g); dispose(g); return url; }
 
 /* ---------- sizing and the frame loop (renders only when something changed) ---------- */
 var dirty3 = true, planDirty = true, uiDirty = true, shadowsDirty = true;
@@ -1204,6 +1306,7 @@ if (HASH.debug){ if (HASH.ao != null) gtao.output = +HASH.ao;
     $('#phOp').value = 0; $('#photo').style.opacity = 0; sizeModel(); } }
 if (HASH.debug) window.ROOM = {ev: function(src){ return eval(src); },   /* debug only: lets a film or test script reach the engine's closure (scripted camera, pieces, colours per frame) */
   T: T, renderer: renderer, scene: scene, composer: composer, gtao: gtao, sun: sun, mcam: mcam, OBJ: OBJ, GIZ: GIZ, redraw: function(){ shadowsDirty = dirty3 = true; }, select: select, goView: goView, setLayout: setLayout, setLook: setLook, view: view, enterPhoto: enterPhoto, exitPhoto: exitPhoto,
+  lib: {open: openLib, close: closeLib, entries: libEntries, add: addPiece, remove: remove, json: layoutJSON, thumb: thumb},
   aoScale: function(k){ AOS = k; sizeModel(); }, snap: function(name, w, h, zoom, at){ var m0 = {w: MV.w, h: MV.h}, cv = curView || 'sw'; MV = {w: w, h: h}; renderer.setPixelRatio(1); renderer.setSize(w, h, false); composer.setPixelRatio(1); composer.setSize(w, h);
     goView(cv, true); SEG.forEach(function(sg){ sg.cut = sg.target; applyCut(sg); }); if (zoom) view.r /= zoom; if (at){ view.tx = at[0]; view.ty = at[1]; view.tz = at[2]; } renderer.shadowMap.needsUpdate = true; render3d();
     return new Promise(function(res){ mc.toBlob(function(b){ fetch('http://127.0.0.1:8794/' + name + '.png', {method: 'POST', body: b}).then(function(){ MV = m0; renderer.setPixelRatio(DPR); sizeModel(); goView(cv, true); res(name); }); }, 'image/png'); }); },
@@ -1276,6 +1379,12 @@ if (HASH.debug && HASH.frame){ var fo = OBJ[HASH.frame] || (FIXOBJ.filter(functi
 if (HASH.debug){ ROOM.audit = audit; if (HASH.test){ var c0 = cur, all = [];
   var checks = []; LAYOUTS.forEach(function(L, i){ setLayout(i); audit().forEach(function(f){ f.layout = i + 1; all.push(f); }); EVAL[i].lines.forEach(function(l){ checks.push({layout: i + 1, level: l.level, text: l.text}); }); }); setLayout(c0);
   [['audit', all], ['checks', checks]].forEach(function(x){ var pre = document.createElement('pre'); pre.id = x[0]; pre.textContent = JSON.stringify(x[1]); document.body.appendChild(pre); }); } }   /* checks: what the panel says, for a fixture's expect.json */
+if (HASH.debug && (HASH.libadd || HASH.libtest)){ /* debug only: libadd=sofa3,art adds those catalogue entries; libtest adds two, takes one out, and writes what the page stores and copies to pre#libtest */
+  var byId = function(id){ return libEntries().filter(function(e){ return !e.room && e.id === id; })[0]; }, got = [];
+  if (HASH.libtest){ var ents = libEntries().filter(function(e){ return !e.room; }); got = [addPiece(ents[0]), addPiece(ents[1])]; remove(got[1]); save();
+    var lt = document.createElement('pre'); lt.id = 'libtest'; lt.textContent = JSON.stringify({added: got[0], removed: got[1], store: JSON.parse(localStorage.getItem(C.storageKey)), copy: JSON.parse(layoutJSON())}); document.body.appendChild(lt); }
+  else String(HASH.libadd).split(',').forEach(function(id){ if (byId(id)) addPiece(byId(id)); }); }
+if (HASH.debug && HASH.lib) openLib();   /* debug only: open the library for a capture */
 requestAnimationFrame(loop);
 })();
 </script>
