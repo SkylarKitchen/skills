@@ -3,6 +3,7 @@
     python3 test.py [project-dir ...]     (default: every fixture in tests/, and the starter's sample room)
 
 A project dir holds a config.js, as for build.py; it is built into a temp folder, so nothing is written beside it.
+The page must also load its photo finishes (textures/, which build.py copies in); Chrome runs with file access so a file:// page may read them.
 An optional expect.json beside it pins what the panel's checks say per option: {"3": {"has": ["Arc lamp’s shade hangs into the bookshelf"], "not": [...]}}.
 Needs Google Chrome (or CHROME=<path>) and the network, since three.js loads from a CDN. Exits 1 on any finding."""
 import glob, html, json, os, re, shutil, subprocess, sys, tempfile, time
@@ -26,7 +27,7 @@ for d in dirs:
     out = os.path.join(tmp, 'dom.html')   # a file, not a pipe: Chrome's helper processes can hold a pipe open long after the dump
     with open(out, 'w') as f:
         pr = subprocess.Popen([chrome, '--headless=new', '--user-data-dir=' + prof, '--disable-gpu', '--use-angle=swiftshader',
-                               '--enable-unsafe-swiftshader', '--disable-extensions', '--window-size=1200,800', '--virtual-time-budget=8000',
+                               '--enable-unsafe-swiftshader', '--disable-extensions', '--allow-file-access-from-files', '--window-size=1200,800', '--virtual-time-budget=8000',
                                '--dump-dom', 'file://' + os.path.join(tmp, 'index.html') + '#debug&test'], stdout=f, stderr=subprocess.DEVNULL)
         for _ in range(180):   # headless Chrome can linger after the dump, so stop it once the page is written (90 s at most)
             if pr.poll() is not None or '</html>' in open(out).read(): break
@@ -39,6 +40,10 @@ for d in dirs:
     if not m:
         print('FAIL', name, '- no audit in the page (a script error, or the CDN was unreachable)'); bad += 1; continue
     found = json.loads(html.unescape(m.group(1)))
+    mf = re.search(r'<pre id="finishes">(.*?)</pre>', dom, re.S)   # the loader reports 'photo', or why it kept the drawn finishes
+    if not mf or mf.group(1) != 'photo': found.append({'layout': 0, 'text': 'photo finishes: ' + (html.unescape(mf.group(1)) if mf else 'the loader never reported')})
+    ml = re.search(r'<pre id="light">(.*?)</pre>', dom, re.S)   # the photo view's light, re-captured: it must not drift
+    if not ml or ml.group(1) != 'steady': found.append({'layout': 0, 'text': 'photo light: ' + (ml.group(1) if ml else 'the check never ran')})
     ex = os.path.join(d, 'expect.json')
     if os.path.exists(ex):   # a planted fault the checks must name, or a clean case they must not flag
         mc = re.search(r'<pre id="checks">(\[.*?\])</pre>', dom, re.S); lines = json.loads(html.unescape(mc.group(1))) if mc else []
@@ -47,7 +52,7 @@ for d in dirs:
             found += [{'layout': int(opt), 'text': 'the checks should say “%s”' % t} for t in e.get('has', []) if t not in said]
             found += [{'layout': int(opt), 'text': 'the checks should not say “%s”' % t} for t in e.get('not', []) if t in said]
     print('ok  ' if not found else 'FAIL', name, '' if not found else '')
-    for f in found: print('     %s: %s' % ('library' if f['layout'] == 0 else 'option %d' % f['layout'], f['text']))
+    for f in found: print('     %s: %s' % ('page' if f['text'].startswith(('photo finishes', 'photo light')) else 'library' if f['layout'] == 0 else 'option %d' % f['layout'], f['text']))
     bad += bool(found)
     shutil.rmtree(tmp, ignore_errors=True)
 sys.exit(1 if bad else 0)

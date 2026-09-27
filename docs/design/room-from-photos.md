@@ -8,7 +8,7 @@ On top of the room sit two or three layouts, each a different idea with a one-li
 
 More example captures (each layout, and the white model) are on the [examples release](https://github.com/SkylarKitchen/skills/releases/tag/examples/room-from-photos).
 
-It works from a starter engine rather than a blank page. The agent copies `starter.html` and fills in one `CONFIG` block: the room's outline, openings, furniture, palette, layouts and one camera per photo. The result is a single HTML file with no build step.
+It works from a starter engine rather than a blank page. The agent copies `starter.html` and fills in one `CONFIG` block: the room's outline, openings, furniture, palette, layouts and one camera per photo. The result is a single HTML file with no build step, served beside a `photos/` folder and a `textures/` folder.
 
 ## When to reach for it
 
@@ -26,7 +26,7 @@ You don't need a tape measure. The agent reads each photo by its perspective, wr
 One works for a simple room. Two or three give a much better model: one from the doorway and one from the opposite corner is the best pair. Five let the agent measure the furniture to within a few inches.
 
 **How real does it look?**
-Close, when rendered on a real GPU. The dollhouse keeps a clean studio light, so every paint and fabric reads as its swatch, with soft sun shadows, window light, lamps that glow, contact shadows under each piece, and mirrors that reflect the room. Seen through a photo's camera, the room lights itself the way the photos do: a grey ceiling that falls off away from the windows, a floor that catches the window light, and a view outside that reads bright, as a camera exposed for the room sees it. The white-model toggle strips all that back when you only want to read the layout.
+Close, when rendered on a real GPU. The wood, fabric, brick and carpet are photo scans of real materials (CC0, from ambientCG) at their true size: the floor and the paneling are cut from them board by board, and each is tinted to the swatch you pick. The dollhouse keeps a clean studio light, so every paint and fabric reads as its swatch, with soft sun shadows, window light, lamps that glow, contact shadows under each piece, and mirrors that reflect the room. Seen through a photo's camera, the room lights itself the way the photos do: a grey ceiling that falls off away from the windows, a floor that catches the window light, and a view outside that reads bright, as a camera exposed for the room sees it. The white-model toggle strips all that back when you only want to read the layout.
 
 **Does it run on a phone?**
 Yes. The layout stacks below 760 px, and the model redraws only when something changes, so it stays light.
@@ -41,4 +41,5 @@ Yes. The layout stacks below 760 px, and the model redraws only when something c
 - The layouts are different ideas, not three nudges of one.
 - Dragging a piece updates the checks and the open-floor figure at once.
 - The page loads with no console errors, at phone width and on a desktop.
-- `python3 test.py <project-dir>` passes: every drawn part of every piece sits where the fit checks think it is, so nothing floats, clips or hangs from nothing.
+- `python3 test.py <project-dir>` passes: every drawn part of every piece sits where the fit checks think it is, so nothing floats, clips or hangs from nothing; the photo finishes load; and the photo view's light holds steady as you edit.
+- The page is served, not opened from disk: from `file://` a browser won't let it read its textures, so it falls back to drawn finishes.

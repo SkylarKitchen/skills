@@ -164,6 +164,7 @@ var CONFIG = {
   storageKey: 'room-starter-v1',          /* unique per page: edits and saved options live under it, per viewer */
   accent: 0x1f4fd8, fill: 0xa6c0f6,       /* accent = selection; fill = the new things in the white model */
   view: 'se', look: 'colour',             /* opening model view (se, sw, nw, ne, top) and look (colour or white) */
+  TEXTURES: 'textures/',                  /* the folder of photo finishes beside the page (build.py copies the skill's in); false keeps the drawn finishes */
   /* Named swatches, grouped by material: sample them from the photos and the inspiration. Each finish offers the groups
      that suit it (walls and trim: paint; floor: wood; upholstery and rugs: fabric; case goods: wood and paint).
      A plain array works too and is offered everywhere. Colours are hex numbers (0xdfe4d8) or strings ('#dfe4d8'). */
@@ -522,7 +523,7 @@ RectAreaLightUniformsLib.init();
 var WINL = OPEN.filter(function(o){ return o.type === 'window'; }).map(function(o){ /* daylight: each window is a soft area light into the room, so light falls off with depth as it does in the photos; aimed a little up so the ceiling takes it too */
   var L = new T.RectAreaLight(0xe9f0fc, LIGHT.win, o.width, o.head - o.sill), y = (o.sill + o.head) / 2, c = add(o.cc, mul(o.w.n, -0.6)), t = add(o.cc, mul(o.w.n, -120));
   L.position.set(c[0], y, c[1]); L.lookAt(t[0], y + 24, t[1]); scene.add(L); return L; });
-var CUBE = new T.WebGLCubeRenderTarget(128, {type: T.HalfFloatType}), CCAM = new T.CubeCamera(4, 1e5, CUBE), envDirty = 2;   /* the capture: small, since it is blurred into diffuse and glossy light anyway */
+var CUBE = new T.WebGLCubeRenderTarget(128, {type: T.HalfFloatType}), CCAM = new T.CubeCamera(4, 1e5, CUBE), envDirty = 1;   /* the capture: small, since it is blurred into diffuse and glossy light anyway */
 var LENS = 26;   /* the model camera's vertical field of view in degrees: a long lens, close to a drawing's parallel lines but with real depth */
 var mcam = new T.PerspectiveCamera(LENS, 1, 1, 8000), persp = new T.PerspectiveCamera(55, 1, 1, 5000);
 function camDist(r){ return r / Math.tan(LENS * Math.PI / 360); }
@@ -536,8 +537,9 @@ var ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 function rnd(seed){ var s = seed % 2147483646 + 1; return function(){ s = s * 16807 % 2147483647; return (s - 1) / 2147483646; }; }
 function canvasTex(cw, ch, inW, inH, draw, grey){ var c = document.createElement('canvas'); c.width = cw; c.height = ch; var g = c.getContext('2d'); draw(g, cw, ch);
   var t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.colorSpace = T.SRGBColorSpace; t.anisotropy = ANISO; t.repeat.set(1 / inW, 1 / inH);
-  if (grey !== false){ var d = g.getImageData(0, 0, cw, ch).data, s = 0, n = 0; for (var i = 0; i < d.length; i += 28){ s += Math.pow(d[i] / 255, 2.2); n++; } t.userData.gain = n / s; }
+  if (grey !== false) t.userData.gain = gainOf(c);
   return t; }
+function gainOf(c){ var d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data, s = 0, n = 0; for (var i = 0; i < d.length; i += 28){ s += Math.pow(d[i] / 255, 2.2); n++; } return n / s; }   /* 1 / the mean linear grey: a tint times this reads as its own hex */
 function grain(g, x0, y0, w, h, r, n, alongY){ /* wavy grain lines along the long axis of a board, clipped to it */
   g.save(); g.beginPath(); g.rect(x0, y0, w, h); g.clip();
   for (var i = 0; i < n; i++){ var c = r(), amp = 0.4 + r() * 3.2, f = 0.5 + r() * 2.5, ph = r() * 6.28, a = 0.03 + r() * 0.11, L = alongY ? h : w, S = alongY ? w : h;
@@ -559,7 +561,7 @@ function normalFrom(t, k){ /* a tangent-space normal map from a texture's greys,
   for (var y = 0; y < h; y++) for (var x = 0; x < w; x++){ var dx = (H(x - 1, y) - H(x + 1, y)) * k, dy = (H(x, y - 1) - H(x, y + 1)) * k, l = Math.sqrt(dx * dx + dy * dy + 1), i = (y * w + x) * 4;
     im.data[i] = (dx / l * 0.5 + 0.5) * 255; im.data[i + 1] = (-dy / l * 0.5 + 0.5) * 255; im.data[i + 2] = (1 / l * 0.5 + 0.5) * 255; im.data[i + 3] = 255; }
   g.putImageData(im, 0, 0); var n = new T.CanvasTexture(o); n.wrapS = n.wrapT = t.wrapS; n.repeat.copy(t.repeat); n.anisotropy = ANISO; return n; }
-var FABRICN = normalFrom(FABRIC, 3), RUGN = FABRICN.clone(); RUGN.needsUpdate = true;   /* the same weave, tiled over a rug's own 0..1 uv (paintRug sets the repeat) */
+var FABRICN = normalFrom(FABRIC, 3), RUGN = FABRICN.clone(), RUGIN = 6; RUGN.needsUpdate = true;   /* the same weave, tiled over a rug's own 0..1 uv (paintRug sets the repeat, one tile per RUGIN inches) */
 var BRICK = canvasTex(512, 504, 32, 31.5, function(g, W, H){ var r = rnd(9), p = 16, bh = 2.25 * p, mh = 0.375 * p, bw = 7.625 * p; g.fillStyle = grey(150); g.fillRect(0, 0, W, H);
   for (var row = 0; row < 12; row++){ var y = row * (bh + mh) + mh / 2, off = row % 2 ? (bw + mh) / 2 : 0;
     for (var x = -bw; x < W + bw; x += bw + mh){ var v = 205 + r() * 45; [0, -W, W].forEach(function(dx){ g.fillStyle = grey(v, 1); g.fillRect(x + off + dx, y, bw, bh); }); } }
@@ -580,12 +582,12 @@ function skyTex(sky, trees, lawn, haze){ return canvasTex(1024, 256, 1, 1, funct
 var SKY0 = skyTex(['#d6e4f3', '#f3f6f8', '#dde5cf', '#b3c490'], ['#b9c79a', '#9fb27a', '#879f63', '#a9bd84', '#c9d4ab'], '#b7c78f');   /* the white model's pale painting of a view */
 var SKY = skyTex(['#e4edf8', '#fbfcfd', '#f0f3e6', '#e2e8cc'], ['#aebb90', '#9aab7b', '#8ea06e', '#a5b487', '#c3cea9'], '#dde4c4', 0.3);   /* in colour it is lit 1.7× too, so as a camera exposed for the room sees it: sky and lawn blown white, trees a pale soft form in the glare */
 SKY0.repeat.set(1, 1); SKY.repeat.set(1, 1);
-function floorTex(bw){ /* strip flooring: boards along the texture's v, staggered butt joints, a tint per board */
+function floorTex(bw){ /* strip flooring: boards along the texture's v, staggered butt joints, a tint per board; each board cut from the wood scan once it has loaded (WOODV), else drawn grain */
   var n = Math.max(6, Math.round(36 / bw)), W = n * bw, L = 96, p = 16, cw = Math.round(W * p), ch = L * p, r = rnd(5);
-  return canvasTex(cw, ch, W, L, function(g){ g.fillStyle = grey(200); g.fillRect(0, 0, cw, ch);
+  return canvasTex(cw, ch, W, L, function(g){ var pat = WOODV && g.createPattern(WOODV, 'repeat'); g.fillStyle = grey(200); g.fillRect(0, 0, cw, ch);
     for (var i = 0; i < n; i++){ var x0 = Math.round(i * bw * p), x1 = Math.round((i + 1) * bw * p), y0 = r() * ch, y = y0, bt = 198 + r() * 34 - (r() < 0.18 ? 22 : 0), bk = (r() - 0.5) * 8;   /* a run of boards shares a tone; one in six is a darker board, each a little warmer or cooler */
-      while (y < y0 + ch){ var len = Math.min((16 + r() * 60) * p, y0 + ch - y), v = bt + (r() - 0.5) * 14, k = bk + (r() - 0.5) * 3;
-        [0, -ch].forEach(function(dy){ var yy = (y % ch) + dy; g.fillStyle = grey(v, k); g.fillRect(x0, yy, x1 - x0, len); grain(g, x0, yy, x1 - x0, len, r, 7, true);
+      while (y < y0 + ch){ var len = Math.min((16 + r() * 60) * p, y0 + ch - y), v = bt + (r() - 0.5) * 14, k = bk + (r() - 0.5) * 3, ox = pat ? r() * WOODV.width : 0, oy = pat ? r() * WOODV.height : 0;
+        [0, -ch].forEach(function(dy){ var yy = (y % ch) + dy; if (pat) woodFill(g, pat, x0, yy, x1 - x0, len, grey(v, k), ox, oy); else { g.fillStyle = grey(v, k); g.fillRect(x0, yy, x1 - x0, len); grain(g, x0, yy, x1 - x0, len, r, 7, true); }
           g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x0, yy, x1 - x0, 1.5); g.fillStyle = 'rgba(255,255,255,.14)'; g.fillRect(x0, yy + 1.5, x1 - x0, 1); });   /* the butt joint: a shadow line and the next board's bevel catching light */
         y += len; }
       g.fillStyle = 'rgba(0,0,0,.38)'; g.fillRect(x0, 0, 1.5, ch); g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(x0 + 1.5, 0, 1, ch); } }); }
@@ -594,11 +596,12 @@ function contactTex(w, d){ /* a footprint's shadow: a dark patch its size, blurr
   var key = Math.round(w) + 'x' + Math.round(d); if (CONTACTS[key]) return CONTACTS[key]; var p = 3, m = 8, cw = Math.round((w + 2 * m) * p), ch = Math.round((d + 2 * m) * p);
   var t = canvasTex(cw, ch, 1, 1, function(g){ g.clearRect(0, 0, cw, ch); g.filter = 'blur(' + (m * p * 0.4).toFixed(1) + 'px)'; g.fillStyle = '#000'; g.fillRect(m * p, m * p, w * p, d * p); g.filter = 'none'; }, false);
   t.wrapS = t.wrapT = T.ClampToEdgeWrapping; t.repeat.set(1, 1); CONTACTS[key] = t; return t; }
-function panelTex(seg){ /* the paneled wall: one texture across it, a plank between each pair of grooves */
-  var L = seg.w.L, p = 6, cw = Math.round(L * p), ch = Math.round(RH * p), r = rnd(21 + seg.w.i), xs = [0].concat(seg.grooves, [L]);
-  var t = canvasTex(cw, ch, L, RH, function(g){ g.fillStyle = grey(210); g.fillRect(0, 0, cw, ch);
-    for (var i = 0; i + 1 < xs.length; i++){ var a = xs[i] * p, b = xs[i + 1] * p; g.fillStyle = grey(182 + r() * 60, (r() - 0.5) * 8); g.fillRect(a, 0, b - a, ch); grain(g, a, 0, b - a, ch, r, Math.round((b - a) / 4), true);
-      if (i){ g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(a - 1, 0, 2, ch); g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(a + 1, 0, 1, ch); } } });
+function panelTex(seg){ /* the paneled wall: one texture across it, a plank between each pair of grooves, each cut from the oak scan once it has loaded (OAKV) */
+  var L = seg.w.L, p = OAKV ? OAKP : 6, cw = Math.round(L * p), ch = Math.round(RH * p), r = rnd(21 + seg.w.i), xs = [0].concat(seg.grooves, [L]);
+  var t = canvasTex(cw, ch, L, RH, function(g){ var pat = OAKV && g.createPattern(OAKV, 'repeat'); g.fillStyle = grey(210); g.fillRect(0, 0, cw, ch);
+    for (var i = 0; i + 1 < xs.length; i++){ var a = xs[i] * p, b = xs[i + 1] * p, tone = grey(182 + r() * 60, (r() - 0.5) * 8);
+      if (pat) woodFill(g, pat, a, 0, b - a, ch, tone, r() * OAKV.width, r() * OAKV.height); else { g.fillStyle = tone; g.fillRect(a, 0, b - a, ch); grain(g, a, 0, b - a, ch, r, Math.round((b - a) / 4), true); }
+      if (i){ g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(a - p / 6, 0, p / 3, ch); g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(a + p / 6, 0, p / 6, ch); } } });   /* the groove: a shadow and the next plank's lit edge, 1/3" and 1/6" */
   t.wrapS = t.wrapT = T.ClampToEdgeWrapping; return t; }
 function rugTex(c1, c2, w, d){ /* a worn vintage rug in its two colours: field, border bands, a medallion, abrash and wear */
   var p = 8, cw = Math.round(w * p), ch = Math.round(d * p), r = rnd(Math.round(w * 7 + d));
@@ -621,6 +624,37 @@ function boxUV(geo, off){ /* uv in inches on each face, u along the face's longe
     var f = a[0] >= a[1] && a[0] >= a[2] ? 0 : a[1] >= a[2] ? 1 : 2, pl = f === 0 ? [2, 1] : f === 1 ? [0, 2] : [0, 1]; if (ex[pl[1]] > ex[pl[0]]) pl = [pl[1], pl[0]];
     uv.setXY(i, v[pl[0]] + o[0], v[pl[1]] + o[1]); } uv.needsUpdate = true; return geo; }
 var UVR = rnd(77);
+
+/* ---------- photo finishes: CC0 scans from ambientCG in textures/ beside the page, drawn over the canvas finishes once they load. Greyscale like the drawn ones
+   and tiled at their real size, so a swatch still tints them. A page opened from disk (file://) may not read an image's pixels, so there the drawn finishes stay ---------- */
+var TEXDIR = C.TEXTURES == null ? 'textures/' : C.TEXTURES, WOODV = null, OAKV = null, OAKP = 10, PHOTO = {state: 'loading'};
+var SCANS = {wood: ['wood.jpg', 31.5], oak: ['oak.jpg', 31.5], fabric: ['fabric.jpg', 5], fabricN: ['fabric-n.jpg', 5], brick: ['brick.jpg', 41.3], brickN: ['brick-n.jpg', 41.3], carpetN: ['carpet-n.jpg', 67]};   /* file, and the inches one tile covers (ambientCG's measured size; the linen's is counted from its threads) */
+function woodFill(g, pat, x, y, w, h, tone, ox, oy){ /* a board or plank cut from the scan at (ox, oy), in its own tone */
+  g.save(); g.translate(x - ox, y - oy); g.fillStyle = pat; g.fillRect(ox, oy, w, h); g.globalCompositeOperation = 'multiply'; g.fillStyle = tone; g.fillRect(ox, oy, w, h); g.restore(); }
+function scanCanvas(im, px, rot){ /* the scan at px pixels a side; rot turns its grain from along u to along v */
+  var c = document.createElement('canvas'), g; c.width = c.height = px; g = c.getContext('2d'); g.imageSmoothingQuality = 'high';
+  if (rot){ g.translate(px, 0); g.rotate(Math.PI / 2); } g.drawImage(im, 0, 0, px, px); return c; }
+function swapImage(t, c, inches){ t.dispose(); t.source = new T.Source(c); if (inches) t.repeat.set(1 / inches, 1 / inches); t.needsUpdate = true; }   /* a new source: a clone shares its original's, and a new size needs a fresh upload */
+function photoState(s){ PHOTO.state = s; if (HASH.test){ var el = $('#finishes') || document.body.appendChild(Object.assign(document.createElement('pre'), {id: 'finishes'})); el.textContent = s; } }   /* test.py reads it */
+function usePhotos(im){ /* everything is built before anything is swapped, so a failure part-way leaves the drawn finishes whole */
+  var c = {}, gain = {}, floor, pans;
+  ['wood', 'fabric', 'brick', 'fabricN', 'brickN', 'carpetN'].forEach(function(k){ c[k] = scanCanvas(im[k], im[k].naturalWidth); });
+  ['wood', 'fabric', 'brick'].forEach(function(k){ gain[k] = gainOf(c[k]); });   /* throws on a tainted canvas */
+  WOODV = scanCanvas(im.wood, Math.round(SCANS.wood[1] * 16), true); OAKV = scanCanvas(im.oak, Math.round(SCANS.oak[1] * OAKP), true);   /* at the floor's 16 px an inch and the paneling's OAKP */
+  try { floor = R.boards ? floorTex(R.boards) : null; pans = SEG.filter(function(s){ return s.panel; }).map(function(s){ return {s: s, t: panelTex(s)}; }); }
+  catch (e){ WOODV = OAKV = null; throw e; }
+  [[WOOD, 'wood'], [FABRIC, 'fabric'], [BRICK, 'brick']].forEach(function(a){ swapImage(a[0], c[a[1]], SCANS[a[1]][1]); a[0].userData.gain = gain[a[1]]; });
+  swapImage(FABRICN, c.fabricN, SCANS.fabricN[1]); swapImage(BRICKN, c.brickN, SCANS.brickN[1]); swapImage(RUGN, c.carpetN); RUGIN = SCANS.carpetN[1];
+  if (floor){ floor.center.copy(FLOORT.center); floor.rotation = FLOORT.rotation; FLOORT.dispose(); FLOORT = floor; }
+  pans.forEach(function(p){ p.s.panelM.userData.tex.dispose(); p.s.panelM.userData.tex = p.t; });
+  world.traverse(function(o){ if (o.userData.rugKey) o.userData.rugKey = null; }); THUMB.cache = {};
+  paintRoom(); Object.keys(OBJ).forEach(recolor); }   /* every tint again, at the scans' gains */
+function loadPhotos(){ if (!TEXDIR || (HASH.debug && HASH.drawn)) return photoState('drawn');   /* #debug&drawn: the drawn finishes, for a before-and-after */
+  var keys = Object.keys(SCANS), im = {}, left = keys.length, miss = [];
+  keys.forEach(function(k){ var i = new Image(); i.onload = i.onerror = function(e){ if (e.type === 'error') miss.push(SCANS[k][0]); else im[k] = i; if (!--left) done(); }; i.src = TEXDIR + SCANS[k][0]; });
+  function done(){ if (miss.length) return photoState('drawn: missing ' + miss.join(', '));
+    try { usePhotos(im); photoState('photo'); } catch (e){ photoState('drawn: ' + (e.name === 'SecurityError' ? 'the page may not read its images (opened from disk?)' : e.message)); } } }
+loadPhotos();
 
 /* materials by finish kind; a swatch tints them */
 var SURF = {lounge: ['wood', 'fabric'], floorlamp: ['wood', 'shade'], floorplant: ['clay'], art: ['wood', 'print'], sofa: ['fabric', 'fabric'], armchair: ['fabric', 'fabric'], ottoman: ['fabric', 'wood'], petbed: ['fabric', 'fabric'], bed: ['wood', 'fabric'], crib: ['paint', 'fabric'],
@@ -698,7 +732,7 @@ function applyLight(){ /* the dollhouse is the working view, so it keeps the stu
   scene.traverse(function(o){ [].concat(o.material || []).forEach(function(m){ if (m.userData.envi0 != null) m.envMapIntensity = ph ? m.userData.envi1 : m.userData.envi0; }); });
   WINL.forEach(function(L){ L.visible = col; L.intensity = LIGHT.win; }); setMap(SKYM, ph ? SKY : SKY0); SKYM.color.setScalar(ph ? LIGHT.sky : 1);
   renderer.toneMappingExposure = ph ? LIGHT.exp : 1; sun.intensity = ph ? LIGHT.sun : 3.2; sun.color.setHex(ph ? 0xfffaf4 : 0xfff3e3); VIG.uniforms.k.value = LIGHT.vig;
-  CEIL.material.emissive.setHex(ph ? 0 : 0x615f5b); if (ph) envDirty = 2; shadowsDirty = dirty3 = true; }
+  CEIL.material.emissive.setHex(ph ? 0 : 0x615f5b); if (ph) envDirty = 1; shadowsDirty = dirty3 = true; }
 
 /* walls: pieces around openings; walls facing the camera drop to a low cut with a dark cut face */
 var SEG = WALLS.map(function(w){ var pan = !!(R.paneling && R.paneling.walls.indexOf(w.i) >= 0), gr = [], seg;
@@ -942,7 +976,7 @@ function printTex(c1, c2, w, h, style, seed){ /* a picture in the piece's print 
 function paintPrint(g, m, cs){ var it = g.userData.it, key = cs.join(',') + ':' + it.w + 'x' + it.h; if (g.userData.printKey === key) return;
   if (m.map) m.map.dispose(); var mm = Math.min(it.w, it.h) * (it.print === 'poster' ? 0.04 : 0.12); m.map = printTex(cs[0], cs[1], it.w - 2.4 - 2 * mm, it.h - 2.4 - 2 * mm, it.print, it.w * 3 + it.h); m.color.setHex(0xffffff); m.needsUpdate = true; g.userData.printKey = key; }
 function paintRug(g, m, cs){ var it = g.userData.it, key = cs.join(',') + ':' + it.w + 'x' + it.d; if (g.userData.rugKey === key) return;
-  if (m.map) m.map.dispose(); m.map = rugTex(cs[0], cs[1], it.w, it.d); m.color.setHex(0xffffff); if (m.normalMap) m.normalMap.repeat.set(it.w / 6, it.d / 6); m.needsUpdate = true; g.userData.rugKey = key; }
+  if (m.map) m.map.dispose(); m.map = rugTex(cs[0], cs[1], it.w, it.d); m.color.setHex(0xffffff); if (m.normalMap) m.normalMap.repeat.set(it.w / RUGIN, it.d / RUGIN); m.needsUpdate = true; g.userData.rugKey = key; }
 function mirrorOf(n, on){ /* a mirror shows the room across from it, which no environment map can: a Reflector renders the scene from the mirrored camera (only when the page redraws) */
   var r = n.userData.refl, p = n.geometry.parameters;
   if (!r && on){ r = n.userData.refl = new Reflector(new T.PlaneGeometry(p.width, p.height), {textureWidth: 768, textureHeight: Math.round(768 * p.height / p.width), color: 0xd4d8d7, clipBias: 0.003}); r.position.z = 0.02; n.add(r);
@@ -988,9 +1022,18 @@ function captureEnv(){ /* the room's own light: rendered from its centre with th
   if (LOOK !== 'colour' || mode !== 'photo'){ envDirty = 0; return; } var cv = CEIL.visible, cuts = SEG.map(function(sg){ return sg.cut; }), fr = sel && OBJ[sel] && OBJ[sel].userData.frame, fv = fr && fr.visible;
   CEIL.visible = true; SEG.forEach(function(sg){ if (sg.cut !== RH){ sg.cut = RH; applyCut(sg); } }); if (fr) fr.visible = false; mountVis(); syncDecals();
   var wood = [FLOORM].concat(PANELS), keep = wood.map(function(m){ return m.color.clone(); }); wood.forEach(function(m){ greyer(m.color, LIGHT.grey); });   /* the capture sees the wood half as saturated: its bounce warms corners and the wall beside it, not the whole of a white wall */
-  CCAM.position.set(RC[0], RH * 0.55, RC[1]); renderer.shadowMap.needsUpdate = true; CCAM.update(renderer, scene); wood.forEach(function(m, i){ m.color.copy(keep[i]); });
-  var rt = PMREM.fromCubemap(CUBE.texture); if (ENVROOM) ENVROOM.dispose(); ENVROOM = rt; scene.environment = rt.texture;
-  SEG.forEach(function(sg, i){ if (sg.cut !== cuts[i]){ sg.cut = cuts[i]; applyCut(sg); } }); CEIL.visible = cv; if (fr) fr.visible = fv; renderer.shadowMap.needsUpdate = true; envDirty = Math.max(0, envDirty - 1); }
+  CCAM.position.set(RC[0], RH * 0.55, RC[1]); renderer.shadowMap.needsUpdate = true; scene.environment = ENVGEN;
+  for (var k = 0; k < 2; k++){ CCAM.update(renderer, scene); var rt = PMREM.fromCubemap(CUBE.texture); if (ENVROOM) ENVROOM.dispose(); ENVROOM = rt; scene.environment = rt.texture; }   /* two bounces, always from the studio: a capture lit by the last one added a bounce, and the room darkened with every edit */
+  wood.forEach(function(m, i){ m.color.copy(keep[i]); });
+  SEG.forEach(function(sg, i){ if (sg.cut !== cuts[i]){ sg.cut = cuts[i]; applyCut(sg); } }); CEIL.visible = cv; if (fr) fr.visible = fv; renderer.shadowMap.needsUpdate = true; envDirty = 0; }
+function lightCheck(){ /* #test: the photo view's light must be the same however often the room is re-captured, or every edit shifts it */
+  var m0 = mode, l0 = LOOK, gl = renderer.getContext(), out = document.body.appendChild(Object.assign(document.createElement('pre'), {id: 'light'}));
+  function lum(){ renderer.setRenderTarget(null); renderer.render(scene, mcam); var w = gl.drawingBufferWidth, h = gl.drawingBufferHeight, px = new Uint8Array(w * h * 4), s = 0, n = 0; gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    for (var i = 0; i < px.length; i += 64) if (px[i + 3]){ s += px[i] + px[i + 1] + px[i + 2]; n++; } return s / n / 3; }
+  mode = 'photo'; LOOK = 'colour'; applyLight(); captureEnv(); captureEnv(); var a = lum(); for (var k = 0; k < 4; k++) captureEnv(); var b = lum();
+  mode = m0; LOOK = l0; applyLight(); dirty3 = true;
+  out.textContent = Math.abs(b - a) < 0.5 ? 'steady' : 'drifts from ' + a.toFixed(1) + ' to ' + b.toFixed(1) + ' after four more captures'; }
+if (HASH.debug && HASH.test) setTimeout(lightCheck, 0);
 var AOS = 0.5, gtaoSize = gtao.setSize.bind(gtao); gtao.setSize = function(w, h){ gtaoSize(Math.max(1, Math.round(w * AOS)), Math.max(1, Math.round(h * AOS))); };   /* occlusion at half resolution: a quarter of the cost, and it is soft anyway */
 gtao.updateGtaoMaterial({radius: 22, distanceExponent: 1.4, thickness: 36, scale: 1.6, samples: 16, distanceFallOff: 1});   /* inches: thickness spans a sofa's height, or furniture never occludes the floor */ gtao.updatePdMaterial({lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6});
 (function(){ var ov = gtao.overrideVisibility.bind(gtao); gtao.overrideVisibility = function(){ ov(); scene.traverse(function(o){ if (o.userData.noAO) o.visible = false; }); }; })();
@@ -1311,7 +1354,7 @@ if (HASH.debug) window.ROOM = {ev: function(src){ return eval(src); },   /* debu
   aoScale: function(k){ AOS = k; sizeModel(); }, snap: function(name, w, h, zoom, at){ var m0 = {w: MV.w, h: MV.h}, cv = curView || 'sw'; MV = {w: w, h: h}; renderer.setPixelRatio(1); renderer.setSize(w, h, false); composer.setPixelRatio(1); composer.setSize(w, h);
     goView(cv, true); SEG.forEach(function(sg){ sg.cut = sg.target; applyCut(sg); }); if (zoom) view.r /= zoom; if (at){ view.tx = at[0]; view.ty = at[1]; view.tz = at[2]; } renderer.shadowMap.needsUpdate = true; render3d();
     return new Promise(function(res){ mc.toBlob(function(b){ fetch('http://127.0.0.1:8794/' + name + '.png', {method: 'POST', body: b}).then(function(){ MV = m0; renderer.setPixelRatio(DPR); sizeModel(); goView(cv, true); res(name); }); }, 'image/png'); }); },
-  snapPhoto: function(i, name, full){ var m0 = {w: MV.w, h: MV.h}; enterPhoto(i); MV = {w: 2000, h: 1500}; photoAspect = 4 / 3; renderer.setPixelRatio(1); renderer.setSize(2000, 1500, false); photoCam(PH[i]); cutTargets(); SEG.forEach(function(sg){ sg.cut = sg.target; applyCut(sg); }); renderer.shadowMap.needsUpdate = true;
+  snapPhoto: function(i, name, full){ var m0 = {w: MV.w, h: MV.h}; enterPhoto(i); MV = {w: 2000, h: 1500}; photoAspect = 4 / 3; renderer.setPixelRatio(1); renderer.setSize(2000, 1500, false); photoCam(PH[i]); cutTargets(); SEG.forEach(function(sg){ sg.cut = sg.target; applyCut(sg); }); renderer.shadowMap.needsUpdate = true; applyLight(); captureEnv();   /* the photo grading and the room's light, which the frame loop would apply, and a hidden tab never runs it */
     if (full){ composer.setPixelRatio(1); composer.setSize(2000, 1500); composer.passes[0].camera = gtao.camera = persp; composer.render(); composer.passes[0].camera = gtao.camera = mcam; } else render3d();
     return new Promise(function(res){ mc.toBlob(function(b){ fetch('http://127.0.0.1:8794/' + name + '.png', {method: 'POST', body: b}).then(function(){ MV = m0; renderer.setPixelRatio(DPR); exitPhoto(); sizeModel(); res(name); }); }, 'image/png'); }); }};   /* local debugging only */
 if (HASH.debug){ ROOM.bench = function(n){ /* frame cost in ms at the pane's size: a still frame, a frame with the shadow map redrawn (a drag), the room-light capture; a pixel read forces the GPU to finish */
