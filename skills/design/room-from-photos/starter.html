@@ -141,6 +141,7 @@ import {RenderPass} from 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/js
 import {GTAOPass} from 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/postprocessing/GTAOPass.js/+esm';
 import {OutputPass} from 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/postprocessing/OutputPass.js/+esm';
 import {ShaderPass} from 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/postprocessing/ShaderPass.js/+esm';
+import {Reflector} from 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/objects/Reflector.js/+esm';
 import {RectAreaLightUniformsLib} from 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/lights/RectAreaLightUniformsLib.js/+esm';
 /* ======================================================================
    CONFIG: the only block a project edits. Units are inches. The plan's x runs right, y runs down.
@@ -625,6 +626,7 @@ function newMat(kind){ var m;
   else if (kind === 'leafWhite') m = stdMat({map: LEAF, alphaTest: 0.5, side: T.DoubleSide, roughness: 0.9});
   else if (kind === 'rug') m = physMat({roughness: 1, sheen: 0.45, sheenRoughness: 0.8, normalMap: RUGN, normalScale: new T.Vector2(0.5, 0.5)});   /* pile: a soft sheen toward the light, and the weave's bump at rug scale */
   else if (kind === 'print') m = stdMat({roughness: 0.75});
+  else if (kind === 'mirror') m = stdMat({color: 0xdfe3e2, roughness: 0.04, metalness: 1}, 1);   /* silvered glass: it shows the environment (the room itself in a photo's view), never a tint */
   else if (kind === 'glass') m = stdMat({color: 0xd6e2de, transparent: true, opacity: 0.1, roughness: 0.05, depthWrite: false});
   else if (kind === 'shade') m = physMat({map: FABRIC, roughness: 0.95, side: T.DoubleSide, emissive: 0xffe2b8, emissiveIntensity: 0.18});
   else if (kind === 'white') m = stdMat({roughness: 0.88});
@@ -898,8 +900,8 @@ function paintGroup(g, cs, base, on, type){ var col = LOOK === 'colour', M = g.u
   g.traverse(function(n){
     if (n.isMesh && n.userData.role){ var r = n.userData.role, h = r === 1 ? cs[0] : r === 2 ? cs[1] : r === 3 ? SOFT : r === 5 ? DARK : r === 6 ? LEGC : WHITE,
         kind = col ? kindFor(type, r, h, n.userData.kind) : r === 7 ? 'leafWhite' : 'white', key = kind + r, m = M[key] || (M[key] = newMat(kind));
-      if (kind === 'white') m.color.setHex(base); else if (kind === 'rug') paintRug(g, m, cs); else if (kind === 'print') paintPrint(g, m, cs); else if (kind !== 'books' && kind !== 'leaf' && kind !== 'leafWhite' && kind !== 'brass' && kind !== 'soil' && kind !== 'glass') tint(m, h);
-      n.material = m; }
+      if (kind === 'white') m.color.setHex(base); else if (kind === 'rug') paintRug(g, m, cs); else if (kind === 'print') paintPrint(g, m, cs); else if (kind !== 'books' && kind !== 'leaf' && kind !== 'leafWhite' && kind !== 'brass' && kind !== 'soil' && kind !== 'glass' && kind !== 'mirror') tint(m, h);
+      n.material = m; if (n.userData.kind === 'mirror') mirrorOf(n, col); }
     else if (n.isLineSegments){ var op = n.material.userData.op || 0.72; n.visible = !!n.userData.detail || !col || !!on; n.material.color.setHex(on ? ACCENT : INK); n.material.opacity = on ? 0.9 : col ? op * 0.6 : op; } });
   if (g.userData.frame) g.userData.frame.visible = !!on && col; lampGlow(g, type); }
 function printTex(c1, c2, w, h, style, seed){ /* a picture in the piece's print colour: a landscape, a poster or an abstract */
@@ -919,6 +921,11 @@ function paintPrint(g, m, cs){ var it = g.userData.it, key = cs.join(',') + ':' 
   if (m.map) m.map.dispose(); var mm = Math.min(it.w, it.h) * (it.print === 'poster' ? 0.04 : 0.12); m.map = printTex(cs[0], cs[1], it.w - 2.4 - 2 * mm, it.h - 2.4 - 2 * mm, it.print, it.w * 3 + it.h); m.color.setHex(0xffffff); m.needsUpdate = true; g.userData.printKey = key; }
 function paintRug(g, m, cs){ var it = g.userData.it, key = cs.join(',') + ':' + it.w + 'x' + it.d; if (g.userData.rugKey === key) return;
   if (m.map) m.map.dispose(); m.map = rugTex(cs[0], cs[1], it.w, it.d); m.color.setHex(0xffffff); if (m.normalMap) m.normalMap.repeat.set(it.w / 6, it.d / 6); m.needsUpdate = true; g.userData.rugKey = key; }
+function mirrorOf(n, on){ /* a mirror shows the room across from it, which no environment map can: a Reflector renders the scene from the mirrored camera (only when the page redraws) */
+  var r = n.userData.refl, p = n.geometry.parameters;
+  if (!r && on){ r = n.userData.refl = new Reflector(new T.PlaneGeometry(p.width, p.height), {textureWidth: 768, textureHeight: Math.round(768 * p.height / p.width), color: 0xd4d8d7, clipBias: 0.003}); r.position.z = 0.02; n.add(r);
+    var rb = r.onBeforeRender; r.onBeforeRender = function(rd, sc, cam){ if (!sc.overrideMaterial) rb.call(this, rd, sc, cam); }; }   /* the AO pass's normal render needs no reflection: skip it, halving the mirror's cost */
+  if (r) r.visible = !!on; }   /* the white model keeps a plain white plane */
 function lampGlow(g, type){ /* a shade with a warm bulb in it: the shade glows and pools light on the wall and ceiling; ROOM.lamps scales every lamp, an item's glow its own (0 = off) */
   var col = LOOK === 'colour', it = g.userData.it || {}, sh = g.userData.shade; if (sh === undefined){ sh = null; g.traverse(function(n){ if (!sh && n.isMesh && n.userData.kind === 'shade') sh = n; }); g.userData.shade = sh;
     if (sh){ var L = new T.PointLight(0xffdcb4, 0, 150, 2); sh.add(L); g.userData.bulb = L; } }   /* the bulb rides on the shade, so it follows wherever a builder hangs it */
@@ -934,7 +941,7 @@ function syncDecals(){ /* the shadow each piece stands in, kept under it from th
 FIXED.forEach(function(F){ var g = build(F.f); g.position.set(F.f.c[0], 0, F.f.c[1]); g.rotation.y = -(F.f.rot || 0) * Math.PI / 180; world.add(g); FIXOBJ.push({g: g, f: F.f, id: F.id}); });
 var FURN = new T.Group(); world.add(FURN); var OBJ = {};
 function recolor(k){ var g = OBJ[k]; if (!g) return; var it = ITEMS[k], on = k === sel; paintGroup(g, itemColors(k), on ? SEL : it.new ? FILL : it.floor ? RUGC : WHITE, on, it.type); }
-function dispose(o){ var M = o.userData.M || {}; Object.keys(M).forEach(function(k){ if ((M[k].userData.kind === 'rug' || M[k].userData.kind === 'print') && M[k].map) M[k].map.dispose(); M[k].dispose(); });
+function dispose(o){ var M = o.userData.M || {}; o.traverse(function(n){ if (n.userData.refl) n.userData.refl.dispose(); }); Object.keys(M).forEach(function(k){ if ((M[k].userData.kind === 'rug' || M[k].userData.kind === 'print') && M[k].map) M[k].map.dispose(); M[k].dispose(); });
   o.traverse(function(n){ if (n.geometry) n.geometry.dispose(); if (n.isLineSegments) n.material.dispose(); }); if (o.userData.frame) o.userData.frame.children[0].material.dispose(); }
 function setObj(k){ var g = OBJ[k], p = place()[k]; g.position.set(p[0], 0, p[1]); g.rotation.y = -(p[2] || 0) * Math.PI / 180; }
 function makeObj(k){ var it = ITEMS[k], g = build(it), f = frameFor(it); g.add(f); g.userData.frame = f; g.userData.id = k; if (it.floor) g.traverse(function(n){ n.castShadow = false; });
