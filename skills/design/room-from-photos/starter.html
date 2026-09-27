@@ -42,6 +42,7 @@ header .sub{font-size:12.5px;color:var(--ink-2)}
 .panel section{padding:12px 0;border-bottom:1px solid var(--rule)}
 .panel section:last-child{border-bottom:0}
 .panel h2{font-size:11px;font-family:var(--mono);font-weight:400;color:var(--ink-3);margin:0 0 6px}
+.opth{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.opth button{height:22px;padding:0 8px;font-size:11.5px;margin-top:-4px}
 .panel p{margin:0 0 8px}
 .checks{list-style:none;margin:0 0 8px;padding:0}
 .checks li{display:grid;grid-template-columns:14px 1fr;gap:4px;padding:2px 0}
@@ -129,13 +130,13 @@ dialog textarea{width:min(520px,84vw);height:200px;font:12px var(--mono);border:
     <div class="ctl tl" id="photoBar" hidden><span id="phName"></span><input type="range" id="phOp" min="0" max="1" step="0.05" value="0.5" aria-label="Photo overlay"><button id="phExit">Back to model</button></div>
   </div>
   <aside class="panel">
-    <section><h2 id="optH"></h2><p id="note"></p><ul class="checks" id="checks"></ul><div class="metric" id="metric"></div></section>
+    <section><div class="opth"><h2 id="optH"></h2><button id="reset" hidden></button></div><p id="note"></p><ul class="checks" id="checks"></ul><div class="metric" id="metric"></div></section>
     <section class="insp" id="insp"></section>
     <section id="roomS"><h2>Room · this option</h2><div class="looks" id="looks"></div><div id="roomFin"></div></section>
     <section><h2>Pieces · tap one to change it</h2><div class="chips pieces" id="tray"></div></section>
     <section id="photosS"><h2>Photos · the model drawn over each one</h2><div class="thumbs" id="thumbs"></div><div class="tune" id="tune" hidden></div></section>
     <section class="facts" id="facts"></section>
-    <section><div class="row"><button id="copy">Copy layout for Claude</button><button id="dup">Save as new option</button><button id="reset">Reset option</button></div></section>
+    <section><div class="row"><button id="copy">Copy layout for Claude</button><button id="dup">Save as new option</button></div></section>
   </aside>
 </div>
 </div>
@@ -999,7 +1000,7 @@ var FURN = new T.Group(); world.add(FURN); var OBJ = {};
 function recolor(k){ var g = OBJ[k]; if (!g) return; var it = ITEMS[k], on = k === sel; paintGroup(g, itemColors(k), on ? SEL : it.new ? FILL : it.floor ? RUGC : WHITE, on, it.type); }
 function dispose(o){ var M = o.userData.M || {}; o.traverse(function(n){ if (n.userData.refl) n.userData.refl.dispose(); }); Object.keys(M).forEach(function(k){ if ((M[k].userData.kind === 'rug' || M[k].userData.kind === 'print') && M[k].map) M[k].map.dispose(); M[k].dispose(); });
   o.traverse(function(n){ if (n.geometry) n.geometry.dispose(); if (n.isLineSegments) n.material.dispose(); }); if (o.userData.frame) o.userData.frame.children[0].material.dispose(); }
-function setObj(k){ var g = OBJ[k], p = place()[k]; g.position.set(p[0], 0, p[1]); g.rotation.y = -(p[2] || 0) * Math.PI / 180; }
+function setObj(k){ var g = OBJ[k], p = place()[k]; g.position.set(p[0], 0, p[1]); g.rotation.set(0, -(p[2] || 0) * Math.PI / 180, 0); }   /* all three: the ring's quaternion past 90° reads back as x = z = π */
 function makeObj(k){ var it = ITEMS[k], g = build(it), f = frameFor(it); g.add(f); g.userData.frame = f; g.userData.id = k; if (it.floor) g.traverse(function(n){ n.castShadow = false; });
   OBJ[k] = g; FURN.add(g); setObj(k); recolor(k); }
 function buildItems(){ Object.keys(OBJ).forEach(function(k){ FURN.remove(OBJ[k]); dispose(OBJ[k]); }); OBJ = {}; placed(LAYOUTS[cur]).forEach(makeObj); attachGizmo(); shadowsDirty = true; }
@@ -1049,7 +1050,7 @@ GIZ.forEach(function(tc){ OVER.add(tc); var hov = new T.Color(0x0b2a8c);
   tc.addEventListener('dragging-changed', function(e){ gdrag = e.value; GIZ.forEach(function(o){ if (o !== tc) o.enabled = !e.value; }); if (!e.value) renderInsp(); });   /* the arrows and the ring overlap near the piece: whichever takes the press locks the other out, or a slide also turns it */
   tc.addEventListener('objectChange', function(){ var o = tc.object, k = o && o.userData.id; if (!k || !place()[k]) return;
     if (tc.getMode() === 'translate') moveTo(k, o.position.x, o.position.z, true);
-    else { var v = V(0, 0, 1).applyQuaternion(o.quaternion); turnTo(k, Math.round(-Math.atan2(v.x, v.z) * 180 / Math.PI)); } }); });
+    else { var v = V(0, 0, 1).applyQuaternion(o.quaternion); turnTo(k, Math.round(-Math.atan2(v.x, v.z) * 180 / Math.PI)); setObj(k); } }); });   /* re-pose even when the snapped angle held; the ring works each step from its own start, so this never fights it */
 function attachGizmo(){ var g = sel && OBJ[sel] && mode === 'model' ? OBJ[sel] : null; GIZ.forEach(function(tc){ if (g) tc.attach(g); else tc.detach(); }); dirty3 = true; }
 
 /* ---------- camera: map-style (drag pans, wheel or pinch zooms to the cursor, shift-drag turns), presets, a photo match ---------- */
@@ -1174,7 +1175,9 @@ function letter(i){ return String.fromCharCode(65 + i); }
 function renderTabs(){ var box = $('#tabs'); box.textContent = ''; LAYOUTS.forEach(function(L, i){ var ev = EVAL[i], b = el('button', i === cur ? 'on' : '');
   b.appendChild(el('b', '', letter(i))); b.appendChild(document.createTextNode(L.name)); b.appendChild(el('small', '', 'open ' + fmt(ev.open.size) + ' sq' + (ev.issues ? ' · ' + ev.issues + ' to fix' : '')));
   b.onclick = function(){ setLayout(i); }; box.appendChild(b); }); }
-function refreshPanel(){ var L = LAYOUTS[cur], ev = EVAL[cur]; $('#optH').textContent = 'Option ' + letter(cur); $('#note').textContent = L.note || '';
+function refreshPanel(){ var L = LAYOUTS[cur], ev = EVAL[cur]; $('#optH').textContent = 'Option ' + letter(cur); var extra = cur >= BASE.length, B = BASE[cur], rs = $('#reset');
+  rs.hidden = !extra && ['place', 'colors', 'variants', 'added'].every(function(f){ return JSON.stringify(L[f]) === JSON.stringify(B[f]); }); rs.textContent = extra ? 'Delete option' : 'Reset';   /* shown once the option differs from how it was first laid out */
+  rs.title = extra ? 'Remove this saved option' : 'Put this option back the way it was first laid out'; $('#note').textContent = L.note || '';
   var ul = $('#checks'); ul.textContent = ''; ev.lines.forEach(function(l){ var li = el('li', l.level); li.appendChild(el('i')); li.appendChild(el('span', '', l.text));
     if (l.ks.length){ li.dataset.k = l.ks[0]; li.onclick = function(){ select(l.ks[0]); }; } ul.appendChild(li); });
   $('#metric').textContent = 'Open floor ' + Math.round(ev.open.area) + ' sq ft · biggest clear square ' + fmt(ev.open.size);
@@ -1423,6 +1426,16 @@ if (HASH.debug && HASH.frame){ var fo = OBJ[HASH.frame] || (FIXOBJ.filter(functi
 if (HASH.debug){ ROOM.audit = audit; if (HASH.test){ var c0 = cur, all = [];
   var checks = []; LAYOUTS.forEach(function(L, i){ setLayout(i); audit().forEach(function(f){ f.layout = i + 1; all.push(f); }); EVAL[i].lines.forEach(function(l){ checks.push({layout: i + 1, level: l.level, text: l.text}); }); }); setLayout(c0);
   var lib = libEntries().filter(function(e){ return !e.room; }).map(addPiece); audit().forEach(function(f){ if (lib.indexOf(f.id) >= 0){ f.layout = 0; all.push(f); } }); lib.forEach(remove);   /* every catalogue piece passes too (layout 0) */
+  var P0 = clone(place()), wq = new T.Quaternion();   /* each piece keeps its turn in the model: the ring past 90°, then a nudge and a button turn, leave the mesh and its shadow at the plan's angle */
+  function yawOf(o){ var v = V(1, 0, 0).applyQuaternion(o.getWorldQuaternion(wq)); return Math.round(((Math.atan2(v.z, v.x) * 180 / Math.PI) % 360 + 360) % 360) % 360; }
+  Object.keys(OBJ).forEach(function(k){ var g = OBJ[k], it = ITEMS[k], bad = false;
+    function ring(){ GIZ[1].attach(g); g.quaternion.setFromAxisAngle(V(0, 1, 0), -135 * Math.PI / 180); GIZ[1].dispatchEvent({type: 'objectChange'}); }   /* what TransformControls does: writes the quaternion, then says so */
+    [['the ring turned it to 135°', ring], ['the ring held it at 135°', ring],   /* a drag repeats the same snapped angle, which changes nothing in the plan */
+     ['an arrow key nudged it', function(){ var q = place()[k]; moveTo(k, q[0] + 1, q[1]); }],
+     ['the turn button added 90°', function(){ turn(k, 90); }]].forEach(function(s){ if (bad) return; s[1](); syncDecals();
+      var r = place()[k][2] || 0, m = yawOf(g), d = g.userData.decal, t = m !== r ? ' shows ' + m + '° in the model' : d && yawOf(d) !== r ? '’s shadow sits at ' + yawOf(d) + '°' : '';
+      if (t){ bad = true; all.push({layout: c0 + 1, id: k, rule: 'pose', text: it.name + t + ', the plan ' + r + '°, after ' + s[0]}); } }); });
+  GIZ[1].detach(); LAYOUTS[c0].place = P0; setLayout(c0);
   [['audit', all], ['checks', checks]].forEach(function(x){ var pre = document.createElement('pre'); pre.id = x[0]; pre.textContent = JSON.stringify(x[1]); document.body.appendChild(pre); }); } }   /* checks: what the panel says, for a fixture's expect.json */
 if (HASH.debug && (HASH.libadd || HASH.libtest)){ /* debug only: libadd=sofa3,art adds those catalogue entries; libtest adds two, takes one out, and writes what the page stores and copies to pre#libtest */
   var byId = function(id){ return libEntries().filter(function(e){ return !e.room && e.id === id; })[0]; }, got = [];
