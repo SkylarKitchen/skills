@@ -16,6 +16,9 @@ if files | xargs -0 grep -nIE '/(Users|home)/[A-Za-z0-9._-]+/'; then found=1; fi
 if [ -f "$LIST" ]; then
   terms="$(grep -v '^[[:space:]]*$' "$LIST" | paste -sd'|' -)"
   if [ -n "$terms" ] && files | xargs -0 grep -nIiwE "$terms"; then found=1; fi
+  # Commits are published too, so the author email must not be a work or private address.
+  email="$(git var GIT_AUTHOR_IDENT | sed 's/.*<\(.*\)>.*/\1/')"
+  if [ -n "$terms" ] && printf 'author: %s\n' "$email" | grep -iwE "$terms"; then found=1; fi
 else
   echo "note: no denylist at $LIST, so only paths were checked" >&2
 fi
