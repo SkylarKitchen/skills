@@ -140,6 +140,8 @@ import {EffectComposer} from 'https://cdn.jsdelivr.net/npm/three@0.162.0/example
 import {RenderPass} from 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/postprocessing/RenderPass.js/+esm';
 import {GTAOPass} from 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/postprocessing/GTAOPass.js/+esm';
 import {OutputPass} from 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/postprocessing/OutputPass.js/+esm';
+import {ShaderPass} from 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/postprocessing/ShaderPass.js/+esm';
+import {RectAreaLightUniformsLib} from 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/lights/RectAreaLightUniformsLib.js/+esm';
 /* ======================================================================
    CONFIG: the only block a project edits. Units are inches. The plan's x runs right, y runs down.
    ====================================================================== */
@@ -485,10 +487,19 @@ renderer.setPixelRatio(DPR); renderer.setClearColor(0xffffff, 0);   /* transpare
 renderer.toneMapping = T.NeutralToneMapping; renderer.toneMappingExposure = 1;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.VSMShadowMap; renderer.shadowMap.autoUpdate = false;
 var scene = new T.Scene(), world = new T.Group(), OVER = new T.Scene(); scene.add(world);
-(function(){ var pm = new T.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(renderer), 0.04).texture; pm.dispose(); })();
-var ENVI = 0.45;   /* how much of the soft studio light the finishes take */
+var PMREM = new T.PMREMGenerator(renderer), ENVGEN = PMREM.fromScene(new RoomEnvironment(renderer), 0.04).texture, ENVROOM = null;   /* a generic studio for the white model and the first colour frame; the room's own light, captured from its centre, replaces it in colour */
+scene.environment = ENVGEN;
+var ENVI = 0.45;   /* how much of the studio light the finishes take in the white model; in colour every finish takes the captured room at 1, which is its real level */
 var sun = new T.DirectionalLight(0xfff3e3, 3.2); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.4; sun.shadow.radius = 9; sun.shadow.blurSamples = 16;   /* soft, window-sized shadows */
 scene.add(sun); scene.add(sun.target);
+/* the colour model's light, measured against the room's photos (exposure 0.82 and these levels put a photo's ceiling and walls within a few percent, a little brighter than the photo, never darker).
+   The sun and the sky are cooler than they look because a phone balances the oak's warm bounce away, and so must the lights that the captured environment inherits. The white model keeps its own sun at 3.2 and exposure 1 */
+var LIGHT = {exp: 0.82, sun: 2.6, win: 2.0, sky: 1.7, lamp: 1, vig: 0.2, wenv: 0.7, grey: 0.5};   /* wenv: how much of the captured room paint takes; grey: how far the wood is pulled toward grey for the capture */
+RectAreaLightUniformsLib.init();
+var WINL = OPEN.filter(function(o){ return o.type === 'window'; }).map(function(o){ /* daylight: each window is a soft area light into the room, so light falls off with depth as it does in the photos; aimed a little up so the ceiling takes it too */
+  var L = new T.RectAreaLight(0xe9f0fc, LIGHT.win, o.width, o.head - o.sill), y = (o.sill + o.head) / 2, c = add(o.cc, mul(o.w.n, -0.6)), t = add(o.cc, mul(o.w.n, -120));
+  L.position.set(c[0], y, c[1]); L.lookAt(t[0], y + 24, t[1]); scene.add(L); return L; });
+var CUBE = new T.WebGLCubeRenderTarget(128, {type: T.HalfFloatType}), CCAM = new T.CubeCamera(4, 1e5, CUBE), envDirty = 2;   /* the capture: small, since it is blurred into diffuse and glossy light anyway */
 var LENS = 26;   /* the model camera's vertical field of view in degrees: a long lens, close to a drawing's parallel lines but with real depth */
 var mcam = new T.PerspectiveCamera(LENS, 1, 1, 8000), persp = new T.PerspectiveCamera(55, 1, 1, 5000);
 function camDist(r){ return r / Math.tan(LENS * Math.PI / 360); }
@@ -516,18 +527,16 @@ function grey(v, k){ v = Math.round(v); k = k || 0; return 'rgb(' + v + ',' + Ma
 var WOOD = canvasTex(512, 512, 26, 26, function(g, W, H){ var r = rnd(11); g.fillStyle = grey(232); g.fillRect(0, 0, W, H);
   for (var i = 0; i < 40; i++){ var y = r() * H, bh = 6 + r() * 30; g.fillStyle = 'rgba(40,30,20,' + r() * 0.06 + ')'; g.fillRect(0, y, W, bh); g.fillRect(0, y - H, W, bh); }
   grain(g, 0, -H, W, 3 * H, r, 900, false); });
-var FABRIC = canvasTex(256, 256, 3, 3, function(g, W, H){ var r = rnd(5); g.fillStyle = grey(236); g.fillRect(0, 0, W, H);
+var FABRIC = canvasTex(512, 512, 6, 6, function(g, W, H){ var r = rnd(5); g.fillStyle = grey(236); g.fillRect(0, 0, W, H);   /* a 21-thread linen over six inches: an even weave, texture up close and no pattern at all from across the room (specks and mottle read as stains) */
   for (var y = 0; y < H; y += 4){ g.fillStyle = 'rgba(0,0,0,' + (0.03 + r() * 0.05) + ')'; g.fillRect(0, y, W, 2); }
-  for (var x = 0; x < W; x += 4){ g.fillStyle = 'rgba(0,0,0,' + (0.02 + r() * 0.04) + ')'; g.fillRect(x, 0, 2, H); }
-  for (var i = 0; i < 2600; i++){ g.fillStyle = r() < 0.5 ? 'rgba(0,0,0,.07)' : 'rgba(255,255,255,.10)'; g.fillRect(r() * W, r() * H, 1 + r() * 2, 1); }
-  for (i = 0; i < 90; i++){ var sx = r() * W, sy = Math.floor(r() * H / 4) * 4; g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(sx, sy, 8 + r() * 26, 2); g.fillRect(sx - W, sy, 8 + r() * 26, 2); } });
+  for (var x = 0; x < W; x += 4){ g.fillStyle = 'rgba(0,0,0,' + (0.02 + r() * 0.04) + ')'; g.fillRect(x, 0, 2, H); } });
 function normalFrom(t, k){ /* a tangent-space normal map from a texture's greys, same tiling */
   var c = t.image, w = c.width, h = c.height, d = c.getContext('2d').getImageData(0, 0, w, h).data, o = document.createElement('canvas'); o.width = w; o.height = h;
   var g = o.getContext('2d'), im = g.createImageData(w, h), H = function(x, y){ return d[(((y + h) % h) * w + ((x + w) % w)) * 4] / 255; };
   for (var y = 0; y < h; y++) for (var x = 0; x < w; x++){ var dx = (H(x - 1, y) - H(x + 1, y)) * k, dy = (H(x, y - 1) - H(x, y + 1)) * k, l = Math.sqrt(dx * dx + dy * dy + 1), i = (y * w + x) * 4;
     im.data[i] = (dx / l * 0.5 + 0.5) * 255; im.data[i + 1] = (-dy / l * 0.5 + 0.5) * 255; im.data[i + 2] = (1 / l * 0.5 + 0.5) * 255; im.data[i + 3] = 255; }
   g.putImageData(im, 0, 0); var n = new T.CanvasTexture(o); n.wrapS = n.wrapT = t.wrapS; n.repeat.copy(t.repeat); n.anisotropy = ANISO; return n; }
-var FABRICN = normalFrom(FABRIC, 3);
+var FABRICN = normalFrom(FABRIC, 3), RUGN = FABRICN.clone(); RUGN.needsUpdate = true;   /* the same weave, tiled over a rug's own 0..1 uv (paintRug sets the repeat) */
 var BRICK = canvasTex(512, 504, 32, 31.5, function(g, W, H){ var r = rnd(9), p = 16, bh = 2.25 * p, mh = 0.375 * p, bw = 7.625 * p; g.fillStyle = grey(150); g.fillRect(0, 0, W, H);
   for (var row = 0; row < 12; row++){ var y = row * (bh + mh) + mh / 2, off = row % 2 ? (bw + mh) / 2 : 0;
     for (var x = -bw; x < W + bw; x += bw + mh){ var v = 205 + r() * 45; [0, -W, W].forEach(function(dx){ g.fillStyle = grey(v, 1); g.fillRect(x + off + dx, y, bw, bh); }); } }
@@ -540,21 +549,28 @@ var LEAF = canvasTex(64, 160, 1, 1, function(g, W, H){ g.clearRect(0, 0, W, H); 
   var gr = g.createLinearGradient(0, 0, W, 0); gr.addColorStop(0, grey(190)); gr.addColorStop(0.5, grey(245)); gr.addColorStop(1, grey(200)); g.fillStyle = gr; g.fill();
   g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(W / 2, H - 4); g.lineTo(W / 2, 8); g.stroke(); }, false);
 LEAF.repeat.set(1, 1); LEAF.wrapS = LEAF.wrapT = T.ClampToEdgeWrapping;
-var SKY = canvasTex(1024, 256, 1, 1, function(g, W, H){ var gr = g.createLinearGradient(0, 0, 0, H), r = rnd(3);   /* the view: pale sky, a soft tree line, lawn; one tile is 20 ft of wall */
-  gr.addColorStop(0, '#d6e4f3'); gr.addColorStop(0.5, '#f3f6f8'); gr.addColorStop(0.72, '#dde5cf'); gr.addColorStop(1, '#b3c490'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
-  g.filter = 'blur(5px)'; ['#b9c79a', '#9fb27a', '#879f63', '#a9bd84', '#c9d4ab'].forEach(function(c, k){ g.fillStyle = c;
+function skyTex(sky, trees, lawn, haze){ return canvasTex(1024, 256, 1, 1, function(g, W, H){ var gr = g.createLinearGradient(0, 0, 0, H), r = rnd(3);   /* the view: sky, a soft tree line, lawn; one tile is 20 ft of wall */
+  gr.addColorStop(0, sky[0]); gr.addColorStop(0.5, sky[1]); gr.addColorStop(0.72, sky[2]); gr.addColorStop(1, sky[3]); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  g.filter = 'blur(5px)'; trees.forEach(function(c, k){ g.fillStyle = c;
     for (var i = 0; i < 70; i++){ var x = r() * W, y = H * (0.22 + r() * 0.45 + k * 0.03), rr = 14 + r() * 34; [-W, 0, W].forEach(function(o){ g.beginPath(); g.arc(x + o, y, rr, 0, 6.283); g.fill(); }); } });
-  g.filter = 'blur(2px)'; g.fillStyle = '#b7c78f'; g.fillRect(0, H * 0.8, W, H * 0.2); g.filter = 'none'; }, false);
-SKY.repeat.set(1, 1);
+  g.filter = 'blur(2px)'; g.fillStyle = lawn; g.fillRect(0, H * 0.8, W, H * 0.2); g.filter = 'none'; if (haze){ g.fillStyle = 'rgba(255,255,255,' + haze + ')'; g.fillRect(0, 0, W, H); } }, false); }   /* haze: the glare a camera exposed for the room sees, everything outside lifted toward white */
+var SKY0 = skyTex(['#d6e4f3', '#f3f6f8', '#dde5cf', '#b3c490'], ['#b9c79a', '#9fb27a', '#879f63', '#a9bd84', '#c9d4ab'], '#b7c78f');   /* the white model's pale painting of a view */
+var SKY = skyTex(['#e4edf8', '#fbfcfd', '#f0f3e6', '#e2e8cc'], ['#aebb90', '#9aab7b', '#8ea06e', '#a5b487', '#c3cea9'], '#dde4c4', 0.3);   /* in colour it is lit 1.7× too, so as a camera exposed for the room sees it: sky and lawn blown white, trees a pale soft form in the glare */
+SKY0.repeat.set(1, 1); SKY.repeat.set(1, 1);
 function floorTex(bw){ /* strip flooring: boards along the texture's v, staggered butt joints, a tint per board */
   var n = Math.max(6, Math.round(36 / bw)), W = n * bw, L = 96, p = 16, cw = Math.round(W * p), ch = L * p, r = rnd(5);
   return canvasTex(cw, ch, W, L, function(g){ g.fillStyle = grey(200); g.fillRect(0, 0, cw, ch);
-    for (var i = 0; i < n; i++){ var x0 = Math.round(i * bw * p), x1 = Math.round((i + 1) * bw * p), y0 = r() * ch, y = y0;
-      while (y < y0 + ch){ var len = Math.min((16 + r() * 60) * p, y0 + ch - y), v = 204 + r() * 32, k = (r() - 0.5) * 6;
+    for (var i = 0; i < n; i++){ var x0 = Math.round(i * bw * p), x1 = Math.round((i + 1) * bw * p), y0 = r() * ch, y = y0, bt = 198 + r() * 34 - (r() < 0.18 ? 22 : 0), bk = (r() - 0.5) * 8;   /* a run of boards shares a tone; one in six is a darker board, each a little warmer or cooler */
+      while (y < y0 + ch){ var len = Math.min((16 + r() * 60) * p, y0 + ch - y), v = bt + (r() - 0.5) * 14, k = bk + (r() - 0.5) * 3;
         [0, -ch].forEach(function(dy){ var yy = (y % ch) + dy; g.fillStyle = grey(v, k); g.fillRect(x0, yy, x1 - x0, len); grain(g, x0, yy, x1 - x0, len, r, 7, true);
-          g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x0, yy, x1 - x0, 1.5); });
+          g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x0, yy, x1 - x0, 1.5); g.fillStyle = 'rgba(255,255,255,.14)'; g.fillRect(x0, yy + 1.5, x1 - x0, 1); });   /* the butt joint: a shadow line and the next board's bevel catching light */
         y += len; }
       g.fillStyle = 'rgba(0,0,0,.38)'; g.fillRect(x0, 0, 1.5, ch); g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(x0 + 1.5, 0, 1, ch); } }); }
+var CONTACTS = {};
+function contactTex(w, d){ /* a footprint's shadow: a dark patch its size, blurred out past its edge; one per size */
+  var key = Math.round(w) + 'x' + Math.round(d); if (CONTACTS[key]) return CONTACTS[key]; var p = 3, m = 8, cw = Math.round((w + 2 * m) * p), ch = Math.round((d + 2 * m) * p);
+  var t = canvasTex(cw, ch, 1, 1, function(g){ g.clearRect(0, 0, cw, ch); g.filter = 'blur(' + (m * p * 0.4).toFixed(1) + 'px)'; g.fillStyle = '#000'; g.fillRect(m * p, m * p, w * p, d * p); g.filter = 'none'; }, false);
+  t.wrapS = t.wrapT = T.ClampToEdgeWrapping; t.repeat.set(1, 1); CONTACTS[key] = t; return t; }
 function panelTex(seg){ /* the paneled wall: one texture across it, a plank between each pair of grooves */
   var L = seg.w.L, p = 6, cw = Math.round(L * p), ch = Math.round(RH * p), r = rnd(21 + seg.w.i), xs = [0].concat(seg.grooves, [L]);
   var t = canvasTex(cw, ch, L, RH, function(g){ g.fillStyle = grey(210); g.fillRect(0, 0, cw, ch);
@@ -591,8 +607,9 @@ function inPal(group, h){ return !!(PALG[group] || []).some(function(p){ return 
 function kindFor(type, role, h, over){ if (over) return over;
   var k = {3: 'soft', 4: 'books', 5: 'dark', 6: 'wood', 7: 'leaf', 8: 'brass', 9: 'soil'}[role] || (SURF[type] || ['paint', 'paint'])[role - 1] || 'paint';
   if (k === 'wood' || k === 'paint'){ if (inPal('paint', h)) k = 'paint'; else if (inPal('wood', h)) k = 'wood'; } return k; }
-function stdMat(o){ return new T.MeshStandardMaterial(Object.assign({envMapIntensity: ENVI}, o)); }
-function physMat(o){ return new T.MeshPhysicalMaterial(Object.assign({envMapIntensity: ENVI}, o)); }
+function envMat(m, c){ m.userData.envi0 = m.envMapIntensity; m.userData.envi1 = c == null ? 1 : c; if (LOOK === 'colour') m.envMapIntensity = m.userData.envi1; return m; }   /* remembers the white model's level and the colour room's; paintRoom switches between the two */
+function stdMat(o, c){ return envMat(new T.MeshStandardMaterial(Object.assign({envMapIntensity: ENVI}, o)), c); }
+function physMat(o){ return envMat(new T.MeshPhysicalMaterial(Object.assign({envMapIntensity: ENVI}, o))); }
 function newMat(kind){ var m;
   if (kind === 'fabric' || kind === 'soft') m = physMat({map: FABRIC, normalMap: FABRICN, normalScale: new T.Vector2(0.7, 0.7), roughness: 0.9, sheen: 0.7, sheenRoughness: 0.55});
   else if (kind === 'wood') m = stdMat({map: WOOD, roughness: 0.48});
@@ -606,7 +623,7 @@ function newMat(kind){ var m;
   else if (kind === 'books') m = stdMat({vertexColors: true, roughness: 0.75});
   else if (kind === 'leaf') m = stdMat({map: LEAF, alphaTest: 0.5, side: T.DoubleSide, roughness: 0.5, vertexColors: true});
   else if (kind === 'leafWhite') m = stdMat({map: LEAF, alphaTest: 0.5, side: T.DoubleSide, roughness: 0.9});
-  else if (kind === 'rug') m = stdMat({roughness: 1});
+  else if (kind === 'rug') m = physMat({roughness: 1, sheen: 0.45, sheenRoughness: 0.8, normalMap: RUGN, normalScale: new T.Vector2(0.5, 0.5)});   /* pile: a soft sheen toward the light, and the weave's bump at rug scale */
   else if (kind === 'print') m = stdMat({roughness: 0.75});
   else if (kind === 'glass') m = stdMat({color: 0xd6e2de, transparent: true, opacity: 0.1, roughness: 0.05, depthWrite: false});
   else if (kind === 'shade') m = physMat({map: FABRIC, roughness: 0.95, side: T.DoubleSide, emissive: 0xffe2b8, emissiveIntensity: 0.18});
@@ -614,7 +631,8 @@ function newMat(kind){ var m;
   else m = stdMat({roughness: 0.5});   /* paint */
   m.userData.kind = kind; return m; }
 var WHITEC = new T.Color(1, 1, 1);
-function tint(m, h){ m.color.setHex(h); if (m.map && m.map.userData.gain) m.color.multiplyScalar(m.map.userData.gain); if (m.sheen) m.sheenColor.setHex(h).lerp(WHITEC, 0.3); }
+function greyer(c, k){ var l = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; return c.lerp(new T.Color(l, l, l), k); }   /* a colour pulled toward its own grey */
+function tint(m, h, desat){ m.color.setHex(h); if (m.map && m.map.userData.gain) m.color.multiplyScalar(m.map.userData.gain); if (m.sheen) m.sheenColor.setHex(h).lerp(WHITEC, 0.3); if (desat) greyer(m.color, desat); }   /* desat: through a camera, wood under the room's own warm bounce goes redder than a photo of it */
 function setMap(m, t){ if (m.map !== t){ m.map = t; m.needsUpdate = true; } }
 
 /* furniture parts carry a finish role: 1 body, 2 second finish, 3 soft white, 4 books, 5 dark glass, 6 wood legs, 7 leaves, 8 brass, 9 soil */
@@ -624,7 +642,7 @@ function part(g, w, h, d, x, y, z, role, o){ o = o || {}; var r = o.r ? Math.min
   m.position.set(x, y + h / 2, z); m.userData.role = role || 1; if (o.kind) m.userData.kind = o.kind; g.add(m); return m; }
 function cyl(g, rb, rt, h, x, y, z, role, o){ o = o || {}; var m = new T.Mesh(new T.CylinderGeometry(rt, rb, h, o.seg || 16), WM); m.position.set(x, y + h / 2, z);
   m.castShadow = !o.noShadow; m.receiveShadow = true; m.userData.role = role || 1; if (o.kind) m.userData.kind = o.kind; g.add(m); return m; }
-var WM = stdMat({roughness: 0.9}), PM = new T.MeshBasicMaterial({color: POCHE}), WALLM = stdMat({roughness: 0.92, envMapIntensity: 1}), TRIMM = stdMat({roughness: 0.4, envMapIntensity: 1}),
+var WM = stdMat({roughness: 0.9}), PM = new T.MeshBasicMaterial({color: POCHE}), WALLM = stdMat({roughness: 0.92, envMapIntensity: 1}, 0.7), TRIMM = stdMat({roughness: 0.4, envMapIntensity: 1}, 0.7),   /* paint takes 70 % of the room's own bounce: the floor and paneling would tan an off-white wall the photos show near white */
   FLOORM = physMat({roughness: 0.5, clearcoat: 0.35, clearcoatRoughness: 0.28}), GLASSM = physMat({color: 0xeef3f8, transparent: true, opacity: 0.16, roughness: 0.04, depthWrite: false}),
   SKYM = new T.MeshBasicMaterial({map: SKY}), BEYONDM = stdMat({color: 0xd6d2ca, roughness: 1, envMapIntensity: 0.85}), BOOKM = newMat('books'), BOOKW = newMat('white'), PLINES = [], NBOOKS = [], PANELS = [], ROOMEDGES = [];
 var FLOORT = R.boards ? floorTex(R.boards) : null; if (FLOORT && R.boardsDir !== 'y'){ FLOORT.center.set(0.5, 0.5); FLOORT.rotation = Math.PI / 2; }
@@ -643,10 +661,20 @@ var CEIL = (function(){ var sh = new T.Shape(); OUTER.forEach(function(p, i){ if
   var g = new T.ShapeGeometry(sh); g.rotateX(Math.PI / 2); var m = new T.Mesh(g, stdMat({color: 0xf4f2ee, roughness: 1, envMapIntensity: 1.2, emissive: 0x615f5b})); m.position.y = RH;   /* no sun reaches it: bounce light, faked */ m.visible = false; world.add(m); return m; })();
 function paintRoom(){ var col = LOOK === 'colour';
   WALLM.color.setHex(col ? roomColor('walls') : WHITE); TRIMM.color.setHex(col ? roomColor('trim') : WHITE); WM.color.setHex(col ? 0xf1efea : WHITE);
-  setMap(FLOORM, col ? FLOORT : null); tint(FLOORM, col ? roomColor('floor') : WHITE); FLOORM.clearcoat = col ? 0.35 : 0; PM.color.setHex(POCHE);
-  PANELS.forEach(function(m){ setMap(m, col ? m.userData.tex : null); tint(m, col ? roomColor('paneling') : WHITE); });
+  setMap(FLOORM, col ? FLOORT : null); PM.color.setHex(POCHE); PANELS.forEach(function(m){ setMap(m, col ? m.userData.tex : null); });
   PLINES.forEach(function(l){ l.visible = !col; }); ROOMEDGES.forEach(function(l){ l.visible = !col; }); NBOOKS.forEach(function(m){ m.material = col ? BOOKM : BOOKW; });
-  GRID.visible = !col; FIXOBJ.forEach(function(F){ paintGroup(F.g, colorsOf(F.id, F.f), WHITE, false, F.f.type); }); shadowsDirty = dirty3 = true; }
+  GRID.visible = !col; FIXOBJ.forEach(function(F){ paintGroup(F.g, colorsOf(F.id, F.f), WHITE, false, F.f.type); }); LIT.look = null; applyLight(); }
+var LIT = {mode: null, look: null};
+function applyLight(){ /* the dollhouse is the working view, so it keeps the studio (exposure 1, the white model's sun, the generic environment, lamps and window light on) and every swatch reads as itself, bright and clean.
+  A photo's view takes the room's own light and the photo grading instead: the captured environment, exposure 0.82, a cooler sun, wood pulled toward grey, the view outside blown, the vignette. The white model keeps its studio */
+  var col = LOOK === 'colour', ph = col && mode === 'photo'; LIT = {mode: mode, look: LOOK};
+  tint(FLOORM, col ? roomColor('floor') : WHITE, ph && 0.15); FLOORM.clearcoat = col ? (ph ? 0.6 : 0.35) : 0; FLOORM.clearcoatRoughness = ph ? 0.16 : 0.28; FLOORM.roughness = ph ? 0.42 : 0.5;   /* through a camera a waxed floor: the windows streak in it */
+  PANELS.forEach(function(m){ tint(m, col ? roomColor('paneling') : WHITE, ph && 0.12); });
+  WALLM.userData.envi1 = TRIMM.userData.envi1 = LIGHT.wenv; scene.environment = ph && ENVROOM ? ENVROOM.texture : ENVGEN;
+  scene.traverse(function(o){ [].concat(o.material || []).forEach(function(m){ if (m.userData.envi0 != null) m.envMapIntensity = ph ? m.userData.envi1 : m.userData.envi0; }); });
+  WINL.forEach(function(L){ L.visible = col; L.intensity = LIGHT.win; }); setMap(SKYM, ph ? SKY : SKY0); SKYM.color.setScalar(ph ? LIGHT.sky : 1);
+  renderer.toneMappingExposure = ph ? LIGHT.exp : 1; sun.intensity = ph ? LIGHT.sun : 3.2; sun.color.setHex(ph ? 0xfffaf4 : 0xfff3e3); VIG.uniforms.k.value = LIGHT.vig;
+  CEIL.material.emissive.setHex(ph ? 0 : 0x615f5b); if (ph) envDirty = 2; shadowsDirty = dirty3 = true; }
 
 /* walls: pieces around openings; walls facing the camera drop to a low cut with a dark cut face */
 var SEG = WALLS.map(function(w){ var pan = !!(R.paneling && R.paneling.walls.indexOf(w.i) >= 0), gr = [], seg;
@@ -873,7 +901,7 @@ function paintGroup(g, cs, base, on, type){ var col = LOOK === 'colour', M = g.u
       if (kind === 'white') m.color.setHex(base); else if (kind === 'rug') paintRug(g, m, cs); else if (kind === 'print') paintPrint(g, m, cs); else if (kind !== 'books' && kind !== 'leaf' && kind !== 'leafWhite' && kind !== 'brass' && kind !== 'soil' && kind !== 'glass') tint(m, h);
       n.material = m; }
     else if (n.isLineSegments){ var op = n.material.userData.op || 0.72; n.visible = !!n.userData.detail || !col || !!on; n.material.color.setHex(on ? ACCENT : INK); n.material.opacity = on ? 0.9 : col ? op * 0.6 : op; } });
-  if (g.userData.frame) g.userData.frame.visible = !!on && col; }
+  if (g.userData.frame) g.userData.frame.visible = !!on && col; lampGlow(g, type); }
 function printTex(c1, c2, w, h, style, seed){ /* a picture in the piece's print colour: a landscape, a poster or an abstract */
   var p = 6, cw = Math.round(w * p), ch = Math.round(h * p), r = rnd(seed || 5);
   function rgb(c, k, a){ return 'rgba(' + [c >> 16 & 255, c >> 8 & 255, c & 255].map(function(v){ return Math.max(0, Math.min(255, Math.round(v * k))); }).join(',') + ',' + (a == null ? 1 : a) + ')'; }
@@ -890,7 +918,19 @@ function printTex(c1, c2, w, h, style, seed){ /* a picture in the piece's print 
 function paintPrint(g, m, cs){ var it = g.userData.it, key = cs.join(',') + ':' + it.w + 'x' + it.h; if (g.userData.printKey === key) return;
   if (m.map) m.map.dispose(); var mm = Math.min(it.w, it.h) * (it.print === 'poster' ? 0.04 : 0.12); m.map = printTex(cs[0], cs[1], it.w - 2.4 - 2 * mm, it.h - 2.4 - 2 * mm, it.print, it.w * 3 + it.h); m.color.setHex(0xffffff); m.needsUpdate = true; g.userData.printKey = key; }
 function paintRug(g, m, cs){ var it = g.userData.it, key = cs.join(',') + ':' + it.w + 'x' + it.d; if (g.userData.rugKey === key) return;
-  if (m.map) m.map.dispose(); m.map = rugTex(cs[0], cs[1], it.w, it.d); m.color.setHex(0xffffff); m.needsUpdate = true; g.userData.rugKey = key; }
+  if (m.map) m.map.dispose(); m.map = rugTex(cs[0], cs[1], it.w, it.d); m.color.setHex(0xffffff); if (m.normalMap) m.normalMap.repeat.set(it.w / 6, it.d / 6); m.needsUpdate = true; g.userData.rugKey = key; }
+function lampGlow(g, type){ /* a shade with a warm bulb in it: the shade glows and pools light on the wall and ceiling; ROOM.lamps scales every lamp, an item's glow its own (0 = off) */
+  var col = LOOK === 'colour', it = g.userData.it || {}, sh = g.userData.shade; if (sh === undefined){ sh = null; g.traverse(function(n){ if (!sh && n.isMesh && n.userData.kind === 'shade') sh = n; }); g.userData.shade = sh;
+    if (sh){ var L = new T.PointLight(0xffdcb4, 0, 150, 2); sh.add(L); g.userData.bulb = L; } }   /* the bulb rides on the shade, so it follows wherever a builder hangs it */
+  if (!sh) return; var k = (it.glow == null ? 1 : +it.glow) * (R.lamps == null ? 1 : +R.lamps) * LIGHT.lamp; g.userData.bulb.visible = col && k > 0; g.userData.bulb.intensity = 200 * k;   /* a bulb in a daylit room: the shade glows and a soft pool touches the wall, nothing floods it (the photos were taken with the lamps off; lamps: 0 matches them) */
+  var m = sh.material; if (m.userData.kind === 'shade') m.emissiveIntensity = 0.45 * k; }
+var DECAL = new T.Group(); world.add(DECAL);
+function syncDecals(){ /* the shadow each piece stands in, kept under it from the render side so builders and the audit never see it; noAO keeps it out of the occlusion pass */
+  var col = LOOK === 'colour'; DECAL.children.slice().forEach(function(d){ if (!d.userData.g.parent){ DECAL.remove(d); d.material.dispose(); } });
+  Object.keys(OBJ).forEach(function(k){ var g = OBJ[k], it = ITEMS[k], d = g.userData.decal; if (!it || it.floor || (it.contact != null && !+it.contact)) return;
+    if (!d || d.userData.g !== g || !d.parent){ var m = 8; d = new T.Mesh(new T.PlaneGeometry(it.w + 2 * m, it.d + 2 * m), new T.MeshBasicMaterial({map: contactTex(it.w, it.d), transparent: true, opacity: it.contact == null ? 0.5 : +it.contact, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2}));
+      d.rotation.x = -Math.PI / 2; d.renderOrder = 1; d.userData.noAO = true; d.userData.g = g; g.userData.decal = d; DECAL.add(d); }
+    d.visible = col && g.visible; d.position.set(g.position.x, 0.45, g.position.z); d.rotation.z = g.rotation.y; }); }
 FIXED.forEach(function(F){ var g = build(F.f); g.position.set(F.f.c[0], 0, F.f.c[1]); g.rotation.y = -(F.f.rot || 0) * Math.PI / 180; world.add(g); FIXOBJ.push({g: g, f: F.f, id: F.id}); });
 var FURN = new T.Group(); world.add(FURN); var OBJ = {};
 function recolor(k){ var g = OBJ[k]; if (!g) return; var it = ITEMS[k], on = k === sel; paintGroup(g, itemColors(k), on ? SEL : it.new ? FILL : it.floor ? RUGC : WHITE, on, it.type); }
@@ -909,6 +949,19 @@ sun.position.set(RC[0] - 0.8 * RR, RR * 1.35, RC[1] - 0.3 * RR); sun.target.posi
 /* post: ambient occlusion over the colour render, then tone mapping; the gizmo draws after, on top */
 var composer = new EffectComposer(renderer, new T.WebGLRenderTarget(1, 1, {type: T.HalfFloatType, samples: 4}));
 var gtao = new GTAOPass(scene, mcam, 1, 1); composer.addPass(new RenderPass(scene, mcam)); composer.addPass(gtao); composer.addPass(new OutputPass());
+var VIG = new ShaderPass({uniforms: {tDiffuse: {value: null}, k: {value: 0.2}}, vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: 'uniform sampler2D tDiffuse; uniform float k; varying vec2 vUv; void main(){ vec4 c = texture2D(tDiffuse, vUv); float d = length((vUv - 0.5) * vec2(1.0, 0.85)) * 2.0; c.rgb *= 1.0 - k * smoothstep(0.5, 1.45, d); gl_FragColor = c; }'});
+VIG.enabled = false; composer.addPass(VIG);   /* a phone lens's soft corners: only through a photo's camera, in colour */
+var CMP = {w: 0, h: 0};
+function post(cam, w, h){ /* the passes at this size through this camera: occlusion, tone mapping, the vignette */
+  if (CMP.w !== w || CMP.h !== h){ composer.setSize(w, h); CMP = {w: w, h: h}; } composer.passes[0].camera = gtao.camera = cam; VIG.enabled = cam === persp && LOOK === 'colour'; composer.render(); }
+function captureEnv(){ /* the room's own light: rendered from its centre with the walls up and the ceiling on, blurred into an environment, so finishes reflect the windows and take the paneling's warm bounce. Runs once things settle, not per frame */
+  if (LOOK !== 'colour' || mode !== 'photo'){ envDirty = 0; return; } var cv = CEIL.visible, cuts = SEG.map(function(sg){ return sg.cut; }), fr = sel && OBJ[sel] && OBJ[sel].userData.frame, fv = fr && fr.visible;
+  CEIL.visible = true; SEG.forEach(function(sg){ if (sg.cut !== RH){ sg.cut = RH; applyCut(sg); } }); if (fr) fr.visible = false; mountVis(); syncDecals();
+  var wood = [FLOORM].concat(PANELS), keep = wood.map(function(m){ return m.color.clone(); }); wood.forEach(function(m){ greyer(m.color, LIGHT.grey); });   /* the capture sees the wood half as saturated: its bounce warms corners and the wall beside it, not the whole of a white wall */
+  CCAM.position.set(RC[0], RH * 0.55, RC[1]); renderer.shadowMap.needsUpdate = true; CCAM.update(renderer, scene); wood.forEach(function(m, i){ m.color.copy(keep[i]); });
+  var rt = PMREM.fromCubemap(CUBE.texture); if (ENVROOM) ENVROOM.dispose(); ENVROOM = rt; scene.environment = rt.texture;
+  SEG.forEach(function(sg, i){ if (sg.cut !== cuts[i]){ sg.cut = cuts[i]; applyCut(sg); } }); CEIL.visible = cv; if (fr) fr.visible = fv; renderer.shadowMap.needsUpdate = true; envDirty = Math.max(0, envDirty - 1); }
 var AOS = 0.5, gtaoSize = gtao.setSize.bind(gtao); gtao.setSize = function(w, h){ gtaoSize(Math.max(1, Math.round(w * AOS)), Math.max(1, Math.round(h * AOS))); };   /* occlusion at half resolution: a quarter of the cost, and it is soft anyway */
 gtao.updateGtaoMaterial({radius: 22, distanceExponent: 1.4, thickness: 36, scale: 1.6, samples: 16, distanceFallOff: 1});   /* inches: thickness spans a sofa's height, or furniture never occludes the floor */ gtao.updatePdMaterial({lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6});
 (function(){ var ov = gtao.overrideVisibility.bind(gtao); gtao.overrideVisibility = function(){ ov(); scene.traverse(function(o){ if (o.userData.noAO) o.visible = false; }); }; })();
@@ -1110,24 +1163,24 @@ $('#paneToggle').onclick = function(e){ var p = e.target.dataset.p; if (!p) retu
 
 /* ---------- sizing and the frame loop (renders only when something changed) ---------- */
 var dirty3 = true, planDirty = true, uiDirty = true, shadowsDirty = true;
-function sizeModel(){ var r = $('#modelPane').getBoundingClientRect(); if (!r.width || !r.height) return; MV = {w: r.width, h: r.height}; renderer.setSize(r.width, r.height, false); composer.setPixelRatio(DPR); composer.setSize(r.width, r.height);
+function sizeModel(){ var r = $('#modelPane').getBoundingClientRect(); if (!r.width || !r.height) return; MV = {w: r.width, h: r.height}; renderer.setSize(r.width, r.height, false); composer.setPixelRatio(DPR); CMP = {w: 0, h: 0};   /* post() sizes the passes to the view it draws */
   if (curView && !tw){ var f = fitView(view.az, view.el); for (var k in f) view[k] = f[k]; } dirty3 = true; }
 new ResizeObserver(function(){ fitPlan(); sizeModel(); }).observe(document.querySelector('.main'));
 function mountVis(){ /* a piece hung on a wall shows only while that wall stands tall enough to hold it */
   Object.keys(OBJ).forEach(function(k){ var it = ITEMS[k], p = place()[k], best = null; if (!it || !it.mount || !p) return;
     SEG.forEach(function(sg){ var w = sg.w, q = sub([p[0], p[1]], w.a), t = dot(q, w.d), dn = Math.abs(dot(q, w.n)); if (t > -1 && t < w.L + 1 && dn < (it.d || 2) / 2 + 3 && (!best || dn < best.dn)) best = {sg: sg, dn: dn}; });
     OBJ[k].visible = mode === 'photo' || !best || best.sg.cut >= it.mount + it.h * 0.6; }); }
-function render3d(){ mountVis(); if (mode === 'photo'){ var a = MV.w / MV.h, w = MV.w, h = MV.h; if (a > photoAspect) w = h * photoAspect; else h = w / photoAspect;
-    var x = (MV.w - w) / 2, y = (MV.h - h) / 2; renderer.setScissorTest(true); renderer.setViewport(0, 0, MV.w, MV.h); renderer.setScissor(0, 0, MV.w, MV.h); renderer.clear();
-    renderer.setViewport(x, y, w, h); renderer.setScissor(x, y, w, h); renderer.render(scene, persp); renderer.setScissorTest(false); renderer.setViewport(0, 0, MV.w, MV.h); }
-  else { applyCam(); composer.render(); renderer.autoClear = false; renderer.render(OVER, mcam); renderer.autoClear = true; } }
+function render3d(){ mountVis(); syncDecals(); if (mode === 'photo'){ var a = MV.w / MV.h, w = MV.w, h = MV.h; if (a > photoAspect) w = h * photoAspect; else h = w / photoAspect; w = Math.round(w); h = Math.round(h);
+    var x = Math.round((MV.w - w) / 2), y = Math.round((MV.h - h) / 2); renderer.setScissorTest(true); renderer.setViewport(0, 0, MV.w, MV.h); renderer.setScissor(0, 0, MV.w, MV.h); renderer.clear();
+    renderer.setViewport(x, y, w, h); renderer.setScissor(x, y, w, h); post(persp, w, h); renderer.setScissorTest(false); renderer.setViewport(0, 0, MV.w, MV.h); }   /* the photo's view gets the same passes as the model, letterboxed */
+  else { applyCam(); post(mcam, MV.w, MV.h); renderer.autoClear = false; renderer.render(OVER, mcam); renderer.autoClear = true; } }
 var lastR = 0, slow = 0;   /* a slow GPU drops the ambient-occlusion pass while things move, and gets it back on the settled frame */
-function loop(now){ requestAnimationFrame(loop); var active = false;
+function loop(now){ requestAnimationFrame(loop); var active = false; if (LIT.mode !== mode || LIT.look !== LOOK) applyLight(); if (shadowsDirty && !envDirty) envDirty = 1;   /* a change from outside the loop (a piece moved, a colour, a look) also re-lights the room, once it settles */
   if (tw){ if (tw.t0 == null) tw.t0 = now; var k = Math.min(1, (now - tw.t0) / tw.dur); tw.fn(easeIO(k)); if (k >= 1) tw = null; active = true; }
   SEG.forEach(function(sg){ if (sg.cut !== sg.target){ sg.cut += (sg.target - sg.cut) * (reduce ? 1 : 0.2); if (Math.abs(sg.cut - sg.target) < 0.3) sg.cut = sg.target; applyCut(sg); shadowsDirty = true; active = true; } });
-  var moving = active || mdrag || gdrag; if (!moving && !gtao.enabled){ gtao.enabled = true; dirty3 = true; }
+  var moving = active || mdrag || gdrag; if (!moving && !gtao.enabled){ gtao.enabled = true; dirty3 = true; } if (!moving && envDirty) dirty3 = true;
   if (active || dirty3){ if (lastR && now - lastR < 120) slow = slow * 0.8 + (now - lastR > 26 ? 0.2 : 0); lastR = now; gtao.enabled = !(moving && slow > 0.5);
-    if (shadowsDirty){ renderer.shadowMap.needsUpdate = true; shadowsDirty = false; } render3d(); dirty3 = false; }
+    if (shadowsDirty){ renderer.shadowMap.needsUpdate = true; shadowsDirty = false; } if (envDirty && !moving) captureEnv(); render3d(); dirty3 = false; }
   if (planDirty){ drawPlan(); planDirty = false; } if (uiDirty){ refreshPanel(); uiDirty = false; } }
 
 /* ---------- start ---------- */
@@ -1137,8 +1190,11 @@ if (HASH.sel && place()[HASH.sel]) select(HASH.sel);
 if (HASH.pane) $('#paneToggle').onclick({target: {dataset: {p: HASH.pane}}});
 renderTabs(); renderInsp(); renderPhotos(); if (HASH.photo && PH[+HASH.photo - 1]) enterPhoto(+HASH.photo - 1);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ planDirty = true; });
-if (HASH.debug){ if (HASH.ao != null) gtao.output = +HASH.ao; if (HASH.sun) sun.intensity = +HASH.sun; if (HASH.exp) renderer.toneMappingExposure = +HASH.exp;
-  if (HASH.env){ ENVI = +HASH.env; scene.traverse(function(o){ [].concat(o.material || []).forEach(function(m){ if (m.envMapIntensity != null) m.envMapIntensity = ENVI; }); }); } }
+if (HASH.debug){ if (HASH.ao != null) gtao.output = +HASH.ao;
+  var tuned = Object.keys(LIGHT).filter(function(k){ if (HASH[k] == null) return false; LIGHT[k] = +HASH[k]; return true; }); if (tuned.length) paintRoom();   /* light tuning from the hash: exp, sun, win (window light), sky (the view's brightness), lamp (glow), vig */
+  if (HASH.env){ ENVI = +HASH.env; scene.traverse(function(o){ [].concat(o.material || []).forEach(function(m){ if (m.envMapIntensity != null) m.envMapIntensity = ENVI; }); }); }
+  if (HASH.bare){ ['header', '#planPane', '.panel', '#lookCtl'].forEach(function(s){ $(s).style.display = 'none'; }); $('.app').style.gridTemplateRows = '1fr'; $('.main').style.gridTemplateColumns = '1fr'; $('#photoBar').hidden = true;   /* #debug&photo=N&bare: the photo camera's render alone, filling the window, for a capture beside the photo */
+    $('#phOp').value = 0; $('#photo').style.opacity = 0; sizeModel(); } }
 if (HASH.debug) window.ROOM = {ev: function(src){ return eval(src); },   /* debug only: lets a film or test script reach the engine's closure (scripted camera, pieces, colours per frame) */
   T: T, renderer: renderer, scene: scene, composer: composer, gtao: gtao, sun: sun, mcam: mcam, OBJ: OBJ, GIZ: GIZ, redraw: function(){ shadowsDirty = dirty3 = true; }, select: select, goView: goView, setLayout: setLayout, setLook: setLook, view: view, enterPhoto: enterPhoto, exitPhoto: exitPhoto,
   aoScale: function(k){ AOS = k; sizeModel(); }, snap: function(name, w, h, zoom, at){ var m0 = {w: MV.w, h: MV.h}, cv = curView || 'sw'; MV = {w: w, h: h}; renderer.setPixelRatio(1); renderer.setSize(w, h, false); composer.setPixelRatio(1); composer.setSize(w, h);
@@ -1147,6 +1203,12 @@ if (HASH.debug) window.ROOM = {ev: function(src){ return eval(src); },   /* debu
   snapPhoto: function(i, name, full){ var m0 = {w: MV.w, h: MV.h}; enterPhoto(i); MV = {w: 2000, h: 1500}; photoAspect = 4 / 3; renderer.setPixelRatio(1); renderer.setSize(2000, 1500, false); photoCam(PH[i]); cutTargets(); SEG.forEach(function(sg){ sg.cut = sg.target; applyCut(sg); }); renderer.shadowMap.needsUpdate = true;
     if (full){ composer.setPixelRatio(1); composer.setSize(2000, 1500); composer.passes[0].camera = gtao.camera = persp; composer.render(); composer.passes[0].camera = gtao.camera = mcam; } else render3d();
     return new Promise(function(res){ mc.toBlob(function(b){ fetch('http://127.0.0.1:8794/' + name + '.png', {method: 'POST', body: b}).then(function(){ MV = m0; renderer.setPixelRatio(DPR); exitPhoto(); sizeModel(); res(name); }); }, 'image/png'); }); }};   /* local debugging only */
+if (HASH.debug){ ROOM.bench = function(n){ /* frame cost in ms at the pane's size: a still frame, a frame with the shadow map redrawn (a drag), the room-light capture; a pixel read forces the GPU to finish */
+    n = n || 20; var gl = renderer.getContext(), px = new Uint8Array(4), t = {w: MV.w, h: MV.h, dpr: DPR}; function time(f){ var t0 = performance.now(); f(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); return performance.now() - t0; }
+    time(render3d); var s = 0; for (var i = 0; i < n; i++) s += time(render3d); t.still = +(s / n).toFixed(2); renderer.info.autoReset = false; renderer.info.reset(); render3d(); t.calls = renderer.info.render.calls; t.tris = renderer.info.render.triangles; renderer.info.autoReset = true;
+    s = 0; for (i = 0; i < n; i++) s += time(function(){ renderer.shadowMap.needsUpdate = true; render3d(); }); t.moving = +(s / n).toFixed(2);
+    if (typeof captureEnv === 'function'){ s = 0; for (i = 0; i < 3; i++) s += time(captureEnv); t.env = +(s / 3).toFixed(2); } return t; };
+  if (HASH.bench) setTimeout(function(){ var pre = el('pre'); pre.id = 'bench'; pre.textContent = JSON.stringify(ROOM.bench(+HASH.bench)); document.body.appendChild(pre); }, 400); }   /* #debug&bench=N writes the numbers into the page for a headless dump */
 /* test only (#debug&test): the model must agree with itself and with the plan the checks read. test.py reads every option's findings from the pre#audit it writes.
    outside: every part stays over its footprint or a zone a check sees (an arc lamp's reach, a desk chair's front clearance, a hearth). reach: an arc lamp's shade hangs at the arc's end.
    ground: a floor piece stands on the floor and a hung one on its wall, and every part joins the rest. tall: nothing rises past topOf(it). thin: a tube or strut ends on
