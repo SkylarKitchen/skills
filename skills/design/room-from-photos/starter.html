@@ -1106,6 +1106,24 @@ if (HASH.debug) window.ROOM = {ev: function(src){ return eval(src); },   /* debu
   snapPhoto: function(i, name, full){ var m0 = {w: MV.w, h: MV.h}; enterPhoto(i); MV = {w: 2000, h: 1500}; photoAspect = 4 / 3; renderer.setPixelRatio(1); renderer.setSize(2000, 1500, false); photoCam(PH[i]); cutTargets(); SEG.forEach(function(sg){ sg.cut = sg.target; applyCut(sg); }); renderer.shadowMap.needsUpdate = true;
     if (full){ composer.setPixelRatio(1); composer.setSize(2000, 1500); composer.passes[0].camera = gtao.camera = persp; composer.render(); composer.passes[0].camera = gtao.camera = mcam; } else render3d();
     return new Promise(function(res){ mc.toBlob(function(b){ fetch('http://127.0.0.1:8794/' + name + '.png', {method: 'POST', body: b}).then(function(){ MV = m0; renderer.setPixelRatio(DPR); exitPhoto(); sizeModel(); res(name); }); }, 'image/png'); }); }};   /* local debugging only */
+/* test only (#debug&test): the model must agree with the plan the checks read. Every part of a piece stays over its footprint or a reach the checks
+   declare (an arc lamp's shade), and a declared reach holds its part. test.py reads every option's findings from the pre#audit it writes. */
+function audit(){ var out = [], v = new T.Vector3(), inv = new T.Matrix4(), t = 1.5; FURN.updateMatrixWorld(true);
+  Object.keys(OBJ).forEach(function(k){ var it = ITEMS[k], g = OBJ[k], sr = it.shade || 8, far = 0, sb = null;
+    var zones = [[-it.w / 2, it.w / 2, -it.d / 2, it.d / 2]]; if (it.arc) zones.push([-sr, sr, 0, it.arc + sr]);   /* item-local plan: x across, z toward the front; an arc lamp spans base to shade */
+    inv.copy(g.matrixWorld).invert();
+    g.traverse(function(m){ if (!m.isMesh) return; for (var n = m; n; n = n.parent) if (n === g.userData.frame) return;
+      var P = m.geometry.attributes.position, shade = m.userData.kind === 'shade';
+      for (var i = 0; i < P.count; i++){ v.fromBufferAttribute(P, i).applyMatrix4(m.matrixWorld).applyMatrix4(inv);
+        far = Math.max(far, Math.min.apply(null, zones.map(function(b){ return Math.hypot(Math.max(b[0] - v.x, 0, v.x - b[1]), Math.max(b[2] - v.z, 0, v.z - b[3])); })));
+        if (shade){ sb = sb || [1e9, -1e9, 1e9, -1e9]; sb[0] = Math.min(sb[0], v.x); sb[1] = Math.max(sb[1], v.x); sb[2] = Math.min(sb[2], v.z); sb[3] = Math.max(sb[3], v.z); } } });
+    if (far > t) out.push({id: k, rule: 'outside', text: it.name + ' draws a part ' + far.toFixed(1) + '″ past its footprint, where the checks can’t see it'});
+    if (it.arc && sb){ var sx = (sb[0] + sb[1]) / 2, sz = (sb[2] + sb[3]) / 2;
+      if (Math.abs(sx) > 1 || Math.abs(sz - it.arc) > 1) out.push({id: k, rule: 'reach', text: it.name + '’s shade hangs ' + sz.toFixed(1) + '″ in front of its base, not at the arc’s end (' + it.arc + '″)'}); } });
+  return out; }
+if (HASH.debug){ ROOM.audit = audit; if (HASH.test){ var c0 = cur, all = [];
+  LAYOUTS.forEach(function(L, i){ setLayout(i); audit().forEach(function(f){ f.layout = i + 1; all.push(f); }); }); setLayout(c0);
+  var pre = document.createElement('pre'); pre.id = 'audit'; pre.textContent = JSON.stringify(all); document.body.appendChild(pre); } }
 requestAnimationFrame(loop);
 })();
 </script>
