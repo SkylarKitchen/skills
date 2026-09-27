@@ -1380,6 +1380,16 @@ if (HASH.debug && HASH.frame){ var fo = OBJ[HASH.frame] || (FIXOBJ.filter(functi
 if (HASH.debug){ ROOM.audit = audit; if (HASH.test){ var c0 = cur, all = [];
   var checks = []; LAYOUTS.forEach(function(L, i){ setLayout(i); audit().forEach(function(f){ f.layout = i + 1; all.push(f); }); EVAL[i].lines.forEach(function(l){ checks.push({layout: i + 1, level: l.level, text: l.text}); }); }); setLayout(c0);
   var lib = libEntries().filter(function(e){ return !e.room; }).map(addPiece); audit().forEach(function(f){ if (lib.indexOf(f.id) >= 0){ f.layout = 0; all.push(f); } }); lib.forEach(remove);   /* every catalogue piece passes too (layout 0) */
+  var P0 = clone(place()), wq = new T.Quaternion();   /* each piece keeps its turn in the model: the ring past 90°, then a nudge and a button turn, leave the mesh and its shadow at the plan's angle */
+  function yawOf(o){ var v = V(1, 0, 0).applyQuaternion(o.getWorldQuaternion(wq)); return Math.round(((Math.atan2(v.z, v.x) * 180 / Math.PI) % 360 + 360) % 360) % 360; }
+  Object.keys(OBJ).forEach(function(k){ var g = OBJ[k], it = ITEMS[k], bad = false;
+    function ring(){ GIZ[1].attach(g); g.quaternion.setFromAxisAngle(V(0, 1, 0), -135 * Math.PI / 180); GIZ[1].dispatchEvent({type: 'objectChange'}); }   /* what TransformControls does: writes the quaternion, then says so */
+    [['the ring turned it to 135°', ring], ['the ring held it at 135°', ring],   /* a drag repeats the same snapped angle, which changes nothing in the plan */
+     ['an arrow key nudged it', function(){ var q = place()[k]; moveTo(k, q[0] + 1, q[1]); }],
+     ['the turn button added 90°', function(){ turn(k, 90); }]].forEach(function(s){ if (bad) return; s[1](); syncDecals();
+      var r = place()[k][2] || 0, m = yawOf(g), d = g.userData.decal, t = m !== r ? ' shows ' + m + '° in the model' : d && yawOf(d) !== r ? '’s shadow sits at ' + yawOf(d) + '°' : '';
+      if (t){ bad = true; all.push({layout: c0 + 1, id: k, rule: 'pose', text: it.name + t + ', the plan ' + r + '°, after ' + s[0]}); } }); });
+  GIZ[1].detach(); LAYOUTS[c0].place = P0; setLayout(c0);
   [['audit', all], ['checks', checks]].forEach(function(x){ var pre = document.createElement('pre'); pre.id = x[0]; pre.textContent = JSON.stringify(x[1]); document.body.appendChild(pre); }); } }   /* checks: what the panel says, for a fixture's expect.json */
 if (HASH.debug && (HASH.libadd || HASH.libtest)){ /* debug only: libadd=sofa3,art adds those catalogue entries; libtest adds two, takes one out, and writes what the page stores and copies to pre#libtest */
   var byId = function(id){ return libEntries().filter(function(e){ return !e.room && e.id === id; })[0]; }, got = [];
