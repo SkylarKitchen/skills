@@ -15,7 +15,7 @@ Proven on a garden-bed build, then generalised after kitchen and sauna test buil
 | `accent` / `fill` | Dark accent (arrows, plan frame, outline flash, CSS `--accent`) and pale part fill (this step's parts, thumbnails). |
 | `view` | Default view direction vector. |
 | `plan` | Plan inset `{c:[x,z], r}`; `null` derives it from the scene's Box3 (shadow camera always does). |
-| `figure` | Modulor scale figure `[x, z, rotY?]` or `null`: a flat cut-out that faces the view unless `rotY` is given. Frame the overview preset to take in its raised hand, 7.4 ft up. |
+| `figure` | Off (`null`) by default; opt in only when asked, with `[x, z, rotY?]`: a flat cut-out that faces the view unless `rotY` is given. Frame the overview preset to take in its raised hand, 7.4 ft up. |
 | `CAM` | Presets `{c, r, v?, walls?, cut?}`. |
 | `NAMES`, `INVENTORY` | Part labels keyed like `P`; inventory groups `[[group, [[part, qty]]]]`. |
 | `STEPS` | Pages. Besides the copy keys (`title text acts meta time tip parts dims notes inventory calendar`): `detail` `{p, r, hide?:[regKeys], view?}` (the bubble's own pass: hide parts in front, look from another direction), `view` (direction), `walls` `{h, sides?}` (walls on those sides drop to `h` ft; omit sides = all), `cut:[regKeys]` (fade to 0.12 for a cutaway), `onEnter(t)` (special animation; `t` has `lastLand, objs, tween, ease, easeIO, setOpacity, setColor, paint, T, still`; return a new end time to delay marks). Step keys override the preset. |
@@ -25,7 +25,7 @@ PROJECT SCENE block: context geometry (auto-painted white), `wall(side, x0, x1, 
 ## Look (BIG evolution diagram)
 - White model, ink hairline edges (EdgesGeometry, opacity ~0.72), near-flat light: HemisphereLight 0.9 + sun 0.16, one pale PCFSoft shadow. Toon gradient bands 226/241/255.
 - Already-built parts near-white (#ececec). Only this step's new or removed parts in the pale `fill`; arrows in the dark `accent`. Parts page shows the whole kit in fill. The starter default is the blue pair #1F4FD8 / #A6C0F6; one orange (#f28c1e) for both also works.
-- A scale figure in the scene: the starter's `modulorFigure()`, an adult's smooth front-view outline drawn to Le Corbusier's Modulor (crown 183 cm, raised fingertips 226 cm), cut flat in one grey (#555) with no edges. Never people built from cylinders, boxes or spheres: they read as mannequins, not people. Chrome neutral: white paper, ink buttons, grey rules, Geist + Geist Mono, sentence case, square corners. Colour lives only in the picture.
+- No people in the scene by default: every figure tried so far (cylinder people, then a flat Modulor cut-out) read as weird. Scale comes from the dimension lines and the live scale bar. `modulorFigure()` stays in the starter only for an explicit request. Chrome neutral: white paper, ink buttons, grey rules, Geist + Geist Mono, sentence case, square corners. Colour lives only in the picture.
 
 ## Engine (in starter.html)
 - `reg(key, obj, {add, remove, only:[pages], from, lag, each, span, part, grow, noGhost, noArrow})`; a page's scene is the cumulative state; `only` parts fade when their page turns.
