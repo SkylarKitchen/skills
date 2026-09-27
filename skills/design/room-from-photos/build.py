@@ -14,8 +14,10 @@ cfg = open(os.path.join(proj, 'config.js')).read().strip()
 a = eng.index('var CONFIG = {')
 b = eng.index('\n};\n', a) + 3
 out = eng[:a] + cfg + eng[b:]
-m = re.search(r"title:\s*'([^']*)'", cfg)
-if m: out = re.sub(r'<title>.*?</title>', '<title>' + m.group(1).replace('&', '&amp;').replace('<', '&lt;') + '</title>', out, count=1)
+m = re.search(r"""\btitle:\s*(['"])((?:\\.|(?!\1).)*)\1""", cfg)   # either quote style, escapes allowed
+if m:
+    t = re.sub(r'\\(.)', r'\1', m.group(2)).replace('&', '&amp;').replace('<', '&lt;')
+    out = re.sub(r'<title>.*?</title>', lambda _: '<title>' + t + '</title>', out, count=1)
 open(os.path.join(proj, 'index.html'), 'w').write(out)
 print('wrote', os.path.join(proj, 'index.html'), len(out))
 if '--artifact' in sys.argv:

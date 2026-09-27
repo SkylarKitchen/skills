@@ -175,7 +175,7 @@ var CONFIG = {
       {type: 'door', c: [118, 126], width: 32, hinge: 'left', swing: 'in'},
       {type: 'opening', c: [0, 96], width: 48, head: 80, clear: 24, label: 'Closet'}
     ],
-    fixed: [],                            /* built-ins that never move: {name, type, c:[x,y], w, d, h, rot} */
+    fixed: [],                            /* built-ins that never move: {id, name, type, c:[x,y], w, d, h, rot}; c = centre, rot as for items; type 'fireplace' */
     verify: ['Room 11′-6″ × 10′-6″, scaled from the 32″ door', 'Window sill at 30″', 'Closet opening 4′ wide']
   },
   /* w = width across the front, d = depth front to back, h = height. The front is the side you use: the bed's foot,
@@ -206,6 +206,7 @@ var CONFIG = {
   ],
   /* One camera per photo, so the page can draw the model over it: at = where the phone stood (plan x, y), h = lens height,
      yaw = compass of the view (0 looks up the plan, 90 right), pitch up +, roll clockwise +, fov = vertical degrees.
+     src = the image path, label = its caption: {src: 'photos/door.jpg', label: 'From the door', at: [100, 120], h: 60, yaw: 0, pitch: 0, roll: 0, fov: 67}.
      The Photos panel has live fields for these; tune until the model's corners land on the photo's. */
   PHOTOS: []
 };
@@ -288,7 +289,7 @@ var BASEIT = C.ITEMS;
 function vIndex(k, v){ var vs = BASEIT[k] && BASEIT[k].variants; if (!vs) return 0; if (typeof v === 'string'){ for (var i = 0; i < vs.length; i++) if (vs[i].label === v) return i; return 0; } return Math.max(0, Math.min(vs.length - 1, v || 0)); }
 function itemsFor(L){ var out = {}; Object.keys(BASEIT).forEach(function(k){ var b = BASEIT[k], v = b.variants ? b.variants[vIndex(k, L && L.variants && L.variants[k])] : null, it = {}, key;
     for (key in b) if (key !== 'variants') it[key] = b[key]; if (v) for (key in v) if (key !== 'label') it[key] = v[key];
-    var t = TYPES[it.type] || {}; it.id = k; if (it.front == null) it.front = t.front || 0; if (it.side == null) it.side = t.side || 0; it.floor = it.type === 'rug' || !!it.mount; if (it.h == null) it.h = it.floor ? 0.5 : 30;
+    var t = TYPES[it.type] || {}; it.id = k; if (it.d == null) it.d = it.w; if (it.front == null) it.front = t.front || 0; if (it.side == null) it.side = t.side || 0; it.floor = it.type === 'rug' || !!it.mount; if (it.h == null) it.h = it.floor ? 0.5 : 30;
     if (it.type === 'media' && it.tv && it.hb == null) it.hb = it.h + 3 + it.tv * 0.49; out[k] = it; }); return out; }
 function normCols(o){ var cols = {}; Object.keys(o || {}).forEach(function(k){ var v = o[k]; cols[k] = Array.isArray(v) ? v.map(hex) : hex(v); }); return cols; }
 function normVars(o){ var vs = {}; Object.keys(o || {}).forEach(function(k){ if (BASEIT[k]) vs[k] = vIndex(k, o[k]); }); return vs; }
@@ -345,7 +346,8 @@ function evaluate(L){ var pl = L.place, ids = placed(L), polys = {}, out = {bad:
     if (it.front){ var zf = function(dp){ return rectPoly(c, r, -it.w / 2, it.w / 2, it.d / 2, it.d / 2 + dp); }, z = zf(it.front), b = blocked(z, k);
       out.zones.push({poly: z, k: k, blocked: b});
       if (b){ var lo = 0, hi = it.front; for (var n = 0; n < 12; n++){ var m = (lo + hi) / 2; if (blocked(zf(m), k)) hi = m; else lo = m; }
-        line('warn', lo < 3 ? nameOf(k) + '’s front is blocked' : nameOf(k) + ' has ' + fmt(lo) + ' in front; it needs ' + fmt(it.front), [k]); } }
+        if (it.front - lo < 0.5) out.zones[out.zones.length - 1].blocked = false;   /* short by less than the half inch fmt rounds away: not a finding */
+        else line('warn', lo < 3 ? nameOf(k) + '’s front is blocked' : nameOf(k) + ' has ' + fmt(lo) + ' in front; it needs ' + fmt(it.front), [k]); } }
     if (it.side){ var zl = rectPoly(c, r, -it.w / 2 - it.side, -it.w / 2, -it.d / 2, it.d / 2), zr = rectPoly(c, r, it.w / 2, it.w / 2 + it.side, -it.d / 2, it.d / 2);
       var bl = blocked(zl, k), br = blocked(zr, k); out.zones.push({poly: zl, k: k, blocked: bl && br, side: bl}, {poly: zr, k: k, blocked: bl && br, side: br});
       if (bl && br) line('warn', nameOf(k) + ' has no side with ' + fmt(it.side) + ' to get in', [k]); } });
