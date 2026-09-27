@@ -966,7 +966,7 @@ var FURN = new T.Group(); world.add(FURN); var OBJ = {};
 function recolor(k){ var g = OBJ[k]; if (!g) return; var it = ITEMS[k], on = k === sel; paintGroup(g, itemColors(k), on ? SEL : it.new ? FILL : it.floor ? RUGC : WHITE, on, it.type); }
 function dispose(o){ var M = o.userData.M || {}; o.traverse(function(n){ if (n.userData.refl) n.userData.refl.dispose(); }); Object.keys(M).forEach(function(k){ if ((M[k].userData.kind === 'rug' || M[k].userData.kind === 'print') && M[k].map) M[k].map.dispose(); M[k].dispose(); });
   o.traverse(function(n){ if (n.geometry) n.geometry.dispose(); if (n.isLineSegments) n.material.dispose(); }); if (o.userData.frame) o.userData.frame.children[0].material.dispose(); }
-function setObj(k){ var g = OBJ[k], p = place()[k]; g.position.set(p[0], 0, p[1]); g.rotation.y = -(p[2] || 0) * Math.PI / 180; }
+function setObj(k){ var g = OBJ[k], p = place()[k]; g.position.set(p[0], 0, p[1]); g.rotation.set(0, -(p[2] || 0) * Math.PI / 180, 0); }   /* all three: the ring's quaternion past 90° reads back as x = z = π */
 function makeObj(k){ var it = ITEMS[k], g = build(it), f = frameFor(it); g.add(f); g.userData.frame = f; g.userData.id = k; if (it.floor) g.traverse(function(n){ n.castShadow = false; });
   OBJ[k] = g; FURN.add(g); setObj(k); recolor(k); }
 function buildItems(){ Object.keys(OBJ).forEach(function(k){ FURN.remove(OBJ[k]); dispose(OBJ[k]); }); OBJ = {}; placed(LAYOUTS[cur]).forEach(makeObj); attachGizmo(); shadowsDirty = true; }
@@ -1007,7 +1007,7 @@ GIZ.forEach(function(tc){ OVER.add(tc); var hov = new T.Color(0x0b2a8c);
   tc.addEventListener('dragging-changed', function(e){ gdrag = e.value; GIZ.forEach(function(o){ if (o !== tc) o.enabled = !e.value; }); if (!e.value) renderInsp(); });   /* the arrows and the ring overlap near the piece: whichever takes the press locks the other out, or a slide also turns it */
   tc.addEventListener('objectChange', function(){ var o = tc.object, k = o && o.userData.id; if (!k || !place()[k]) return;
     if (tc.getMode() === 'translate') moveTo(k, o.position.x, o.position.z, true);
-    else { var v = V(0, 0, 1).applyQuaternion(o.quaternion); turnTo(k, Math.round(-Math.atan2(v.x, v.z) * 180 / Math.PI)); } }); });
+    else { var v = V(0, 0, 1).applyQuaternion(o.quaternion); turnTo(k, Math.round(-Math.atan2(v.x, v.z) * 180 / Math.PI)); setObj(k); } }); });   /* re-pose even when the snapped angle held; the ring works each step from its own start, so this never fights it */
 function attachGizmo(){ var g = sel && OBJ[sel] && mode === 'model' ? OBJ[sel] : null; GIZ.forEach(function(tc){ if (g) tc.attach(g); else tc.detach(); }); dirty3 = true; }
 
 /* ---------- camera: map-style (drag pans, wheel or pinch zooms to the cursor, shift-drag turns), presets, a photo match ---------- */
