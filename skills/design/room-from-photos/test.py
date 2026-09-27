@@ -3,6 +3,7 @@
     python3 test.py [project-dir ...]     (default: every fixture in tests/, and the starter's sample room)
 
 A project dir holds a config.js, as for build.py; it is built into a temp folder, so nothing is written beside it.
+An optional expect.json beside it pins what the panel's checks say per option: {"3": {"has": ["Arc lamp’s shade hangs into the bookshelf"], "not": [...]}}.
 Needs Google Chrome (or CHROME=<path>) and the network, since three.js loads from a CDN. Exits 1 on any finding."""
 import glob, html, json, os, re, shutil, subprocess, sys, tempfile, time
 here = os.path.dirname(os.path.abspath(__file__))
@@ -38,6 +39,13 @@ for d in dirs:
     if not m:
         print('FAIL', name, '- no audit in the page (a script error, or the CDN was unreachable)'); bad += 1; continue
     found = json.loads(html.unescape(m.group(1)))
+    ex = os.path.join(d, 'expect.json')
+    if os.path.exists(ex):   # a planted fault the checks must name, or a clean case they must not flag
+        mc = re.search(r'<pre id="checks">(\[.*?\])</pre>', dom, re.S); lines = json.loads(html.unescape(mc.group(1))) if mc else []
+        for opt, e in json.load(open(ex)).items():
+            said = [l['text'] for l in lines if l['layout'] == int(opt)]
+            found += [{'layout': int(opt), 'text': 'the checks should say “%s”' % t} for t in e.get('has', []) if t not in said]
+            found += [{'layout': int(opt), 'text': 'the checks should not say “%s”' % t} for t in e.get('not', []) if t in said]
     print('ok  ' if not found else 'FAIL', name, '' if not found else '')
     for f in found: print('     option %d: %s' % (f['layout'], f['text']))
     bad += bool(found)

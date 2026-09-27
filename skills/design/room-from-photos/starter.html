@@ -290,7 +290,7 @@ function vIndex(k, v){ var vs = BASEIT[k] && BASEIT[k].variants; if (!vs) return
 function itemsFor(L){ var out = {}; Object.keys(BASEIT).forEach(function(k){ var b = BASEIT[k], v = b.variants ? b.variants[vIndex(k, L && L.variants && L.variants[k])] : null, it = {}, key;
     for (key in b) if (key !== 'variants') it[key] = b[key]; if (v) for (key in v) if (key !== 'label') it[key] = v[key];
     var t = TYPES[it.type] || {}; it.id = k; if (it.d == null) it.d = it.w; if (it.front == null) it.front = t.front || 0; if (it.side == null) it.side = t.side || 0; it.floor = it.type === 'rug' || !!it.mount; if (it.h == null) it.h = it.floor ? 0.5 : 30;
-    if (it.type === 'media' && it.tv && it.hb == null) it.hb = it.h + 3 + it.tv * 0.49; out[k] = it; }); return out; }
+    if (it.type === 'media' && it.tv && it.hb == null) it.hb = it.h + 3 + it.tv * 0.49; if (it.type === 'bed' && it.hb == null) it.hb = 36; out[k] = it; }); return out; }   /* hb: a headboard or TV the window check sees */
 function normCols(o){ var cols = {}; Object.keys(o || {}).forEach(function(k){ var v = o[k]; cols[k] = Array.isArray(v) ? v.map(hex) : hex(v); }); return cols; }
 function normVars(o){ var vs = {}; Object.keys(o || {}).forEach(function(k){ if (BASEIT[k]) vs[k] = vIndex(k, o[k]); }); return vs; }
 var BASE = C.LAYOUTS.map(function(L){ return {name: L.name, note: L.note || '', place: clone(L.place), colors: normCols(L.colors), variants: normVars(L.variants)}; });
@@ -333,6 +333,10 @@ function evaluate(L){ var pl = L.place, ids = placed(L), polys = {}, out = {bad:
   function blocked(z, self){ return !inRoom(z) || solid.some(function(k){ return k !== self && overlap(z, polys[k]); }) || FIXED.some(function(F){ return overlap(z, F.poly); }); }
   ids.forEach(function(k){ var it = IT[k], p = pl[k], sr = it.shade || 8; if (!inRoom(polys[k])) line('bad', nameOf(k) + ' runs into a wall', [k]);
     else if (it.arc && !inRoom(rectPoly([p[0], p[1]], p[2] || 0, -sr, sr, it.arc - sr, it.arc + sr))) line('bad', nameOf(k) + '’s shade reaches through a wall', [k]); });   /* the reach is past the footprint */
+  ids.forEach(function(k){ var it = IT[k], p = pl[k]; if (!it.arc) return; var A = arcLamp(it), sh = [];   /* an arc lamp's shade hangs clear of whatever is under it */
+    for (var i = 0; i < 16; i++) sh.push(toWorld([p[0], p[1]], p[2] || 0, [Math.cos(i * 0.3927) * A.r, A.reach + Math.sin(i * 0.3927) * A.r]));
+    solid.forEach(function(j){ if (j !== k && topOf(IT[j]) > A.bottom && overlap(sh, polys[j])) line('bad', nameOf(k) + '’s shade hangs into the ' + nameOf(j).toLowerCase(), [k]); });
+    FIXED.forEach(function(F){ if (topOf(F.f) > A.bottom && overlap(sh, F.poly)) line('bad', nameOf(k) + '’s shade hangs into the ' + F.f.name.toLowerCase(), [k]); }); });
   solid.forEach(function(a, i){ solid.slice(i + 1).forEach(function(b){ if (overlap(polys[a], polys[b])) line('bad', nameOf(a) + ' and ' + nameOf(b).toLowerCase() + ' overlap', [a, b]); });
     FIXED.forEach(function(F){ if (overlap(polys[a], F.poly)) line('bad', nameOf(a) + ' sits on the ' + F.f.name.toLowerCase(), [a]);
       else if (F.zone && overlap(polys[a], F.zone)) line('warn', nameOf(a) + ' is too close to the ' + F.f.name.toLowerCase(), [a]); });
@@ -715,18 +719,29 @@ function applyCut(seg){ seg.pieces.forEach(function(m){ var u = m.userData, top 
 var FIXOBJ = [];   /* built-ins, made once BUILD exists */
 
 /* furniture builders: local inches, origin at the footprint's centre on the floor, front = +z; the numbers after the position are finish roles */
-function chair(g, z, r){ var ch = new T.Group(); part(ch, 17, 1.5, 16, 0, 17, 0, r); part(ch, 17, 14, 1.5, 0, 18.5, 7.25, r);
-  [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(function(s){ part(ch, 1.2, 17, 1.2, s[0] * 7.6, 0, s[1] * 7, r); }); ch.position.z = z; g.add(ch); }
+function chair(g, z, r, w, d, h){ w = (w || 18) - 1; d = (d || 18) - 2; h = h || CHAIRH; var sy = h * 0.523, ch = new T.Group();   /* a side chair, back toward +z: a desk's (the default size) or one sized w × d × h */
+  part(ch, w, 1.5, d, 0, sy, 0, r); part(ch, w, h - sy - 1.5, 1.5, 0, sy + 1.5, d / 2 - 0.75, r);
+  [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(function(s){ part(ch, 1.2, sy, 1.2, s[0] * (w / 2 - 0.9), 0, s[1] * (d / 2 - 1), r); }); ch.position.z = z; g.add(ch); }
+var CHAIRH = 32.5;   /* a desk chair's back, above most desks: topOf() allows it */
 function legs(g, w, d, h, r, t){ t = t || 1.5; [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(function(s){ part(g, t, h, t, s[0] * (w / 2 - t), 0, s[1] * (d / 2 - t), r); }); }
 function tapered(g, w, d, h, r, inset){ inset = inset || 2.5; [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(function(s){ cyl(g, 0.45, 0.8, h, s[0] * (w / 2 - inset), 0, s[1] * (d / 2 - inset), r); }); }
-function plant(g, x, y, z, size, seed, upright){ /* a rosette of leaf cards from the soil: upright spears or a leafy mound */
-  var r = rnd(seed), geos = [], n = upright ? 9 : 16;
-  for (var i = 0; i < n; i++){ var ll = size * (upright ? 0.7 + r() * 0.35 : 0.3 + r() * 0.2), lw = ll * (upright ? 0.2 : 0.5), q = new T.PlaneGeometry(lw, ll);
-    q.translate(0, ll / 2, 0); q.rotateX(upright ? 0.05 + r() * 0.3 : 0.5 + r() * 0.8); q.rotateY(i / n * 6.283 + r() * 0.6);
-    q.translate(x + (r() - 0.5) * 1.5, y + (upright ? 0 : r() * size * 0.25), z + (r() - 0.5) * 1.5);
-    var k = 0.75 + r() * 0.4, c = new T.Color(upright ? 0x5d7a45 : 0x4e7440).multiplyScalar(k), a = new Float32Array(q.attributes.position.count * 3);
-    for (var j = 0; j < a.length; j += 3){ a[j] = c.r; a[j + 1] = c.g; a[j + 2] = c.b; } q.setAttribute('color', new T.BufferAttribute(a, 3)); geos.push(q); }
-  var m = new T.Mesh(mergeGeometries(geos), WM); m.userData.role = 7; m.userData.noAO = true; m.castShadow = m.receiveShadow = true; g.add(m); geos.forEach(function(q){ q.dispose(); }); return m; }
+function leaf(geos, base, ll, lw, az, tilt, bend, hx, k, lim){ /* one leaf card from base, leaning tilt from upright toward az, its tip drooping by bend (radians);
+  shrunk about its base until it fits lim {x, z, r, top}: a plant's leaves stay inside its w and under its h */
+  var q = new T.PlaneGeometry(lw, ll, 1, 4), P = q.attributes.position, i, s = 1, n;
+  for (i = 0; i < P.count; i++){ var t = P.getY(i) / ll + 0.5, th = bend * t, x = P.getX(i);
+    P.setXYZ(i, x, bend ? ll * Math.sin(th) / bend : ll * t, (bend ? ll * (1 - Math.cos(th)) / bend : 0) + Math.abs(x) * 0.3); }   /* the midrib curls out and down; the blade cups */
+  q.computeVertexNormals(); q.rotateX(tilt); q.rotateY(az);
+  for (n = 0; n < 9; n++){ var ok = true; for (i = 0; i < P.count && ok; i++){ var vx = base.x + P.getX(i) * s, vy = base.y + P.getY(i) * s, vz = base.z + P.getZ(i) * s;
+      ok = Math.hypot(vx - lim.x, vz - lim.z) <= lim.r && vy <= lim.top && vy >= 0.6; } if (ok) break; s *= 0.8; }
+  if (n === 9){ q.dispose(); return; } q.scale(s, s, s); q.translate(base.x, base.y, base.z); geos.push(colorGeo(q, hx, k)); }
+function foliage(g, geos){ if (!geos.length) return null; var m = new T.Mesh(mergeGeometries(geos), WM); m.userData.role = 7; m.userData.noAO = true; m.castShadow = m.receiveShadow = true; g.add(m);
+  geos.forEach(function(q){ q.dispose(); }); return m; }   /* every leaf of a plant in one mesh */
+function plant(g, x, y, z, size, seed, upright, R){ /* a rosette of leaves from the soil at (x, y, z): upright spears or a leafy mound, within R of its stem */
+  var r = rnd(seed), geos = [], n = upright ? 12 : 24, lim = {x: x, z: z, r: R || size, top: y + size * 1.05};
+  for (var i = 0; i < n; i++){ var ll = size * (upright ? 0.55 + r() * 0.5 : 0.32 + r() * 0.22);
+    leaf(geos, V(x + (r() - 0.5) * 1.2, y + (upright ? 0 : r() * size * 0.12), z + (r() - 0.5) * 1.2), ll, ll * (upright ? 0.17 : 0.48), i / n * 6.283 + r() * 0.6,
+      upright ? 0.04 + r() * 0.28 : 0.35 + r() * 0.95, upright ? r() * 0.3 : 0.5 + r() * 1.0, upright ? 0x5d7a45 : 0x4e7440, 0.72 + r() * 0.45, lim); }
+  return foliage(g, geos); }
 function tube(g, pts, r, role, closed){ var c = pts.getPoint ? pts : new T.CatmullRomCurve3(pts, !!closed, 'catmullrom', 0.35), n = pts.getPoint ? 64 : Math.max(24, pts.length * 12), m = new T.Mesh(new T.TubeGeometry(c, n, r, 10, !!closed), WM);   /* bent wood, a lamp's arc; pts or a curve */
   m.castShadow = m.receiveShadow = true; m.userData.role = role || 1; m.userData.thin = {pts: c.getSpacedPoints(n), r: r}; g.add(m); return c; }   /* thin: its centreline, for the audit */
 function strut(g, a, b, rb, rt, role, free){ var L = a.distanceTo(b), m = cyl(g, rb, rt, L, 0, 0, 0, role); m.position.copy(a).add(b).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(V(0, 1, 0), b.clone().sub(a).normalize());
@@ -737,19 +752,25 @@ function shell(g, curve, w, t, n, role){ /* a cushion laid along a curve, in sho
 function arcLamp(it){ /* an arc lamp's shade: where the builder hangs it and the checks look for it. reach in front of the base; h is the arc's crown */
   var h = it.h || 60, r = it.shade || 8, reach = it.arc, tip = h - Math.max(5, reach * 0.35), top = tip - 2.2, sh = r * 1.3;
   return {reach: reach, r: r, rt: r * 0.72, sh: sh, tip: tip, top: top, bottom: top - sh, stem: Math.min(tip - 4, Math.max(h * 0.4, tip - reach * 1.1))}; }
+function topOf(it){ /* the highest a piece draws, which the checks read as its height: h, and above it only what a type states */
+  if (it.mount) return it.mount + (it.type === 'media' ? (it.tv || 55) * 0.49 : it.h);   /* a hung piece from its mount; a hung TV is its screen */
+  if (it.type === 'stands') return it.h + 30;   /* the potted plants on top: h is the stands' own height */
+  if (it.type === 'desk' && it.chair !== false) return Math.max(it.h, CHAIRH);   /* its chair's back */
+  return Math.max(it.h || 0, it.hb || 0); }   /* a headboard or a TV on its console */
 function drum(g, r0, r1, h, y, role){ var m = cyl(g, r0, r1, h, 0, y, 0, role, {seg: 40, kind: 'shade', noShadow: true}); m.geometry.dispose(); m.geometry = new T.CylinderGeometry(r1, r0, h, 40, 1, true); return m; }
 var BUILD = {
   lounge: function(g, it){ var w = it.w, d = it.d, h = it.h || 39, z0 = -d / 2, z1 = d / 2;   /* a bentwood lounge chair: two cantilever side frames and one long cushion */
     [-1, 1].forEach(function(s){ var x = s * (w / 2 - 1);
-      tube(g, [[z0 + 3, 0.8], [z1 - 6, 0.8], [z1 - 1.5, 4.5], [z1 - 1.5, 13], [z1 - 4.5, 19.5], [z1 - 12, 20.5], [-3, 19], [-5, 15.5]].map(function(p){ return V(x, p[1], p[0]); }), 0.75, 1);
+      tube(g, [[z0 + 3, 0.8], [z1 - 6, 0.8], [z1 - 1.5, 4.5], [z1 - 1.5, 13], [z1 - 4.5, 19.5], [z1 - 12, 20.5], [-3.5, 18.6], [-5.6, 14.2], [-6.6, 10.2]].map(function(p){ return V(x, p[1], p[0]); }), 0.75, 1);
       tube(g, [[z1 - 3, 13.5], [z1 - 9, 10.5], [-1, 8.5], [z0 + 6, 11], [z0 + 3, 22], [z0 + 1.5, h - 4]].map(function(p){ return V(x * 0.94, p[1], p[0]); }), 0.7, 1); });
     part(g, w - 2, 1.2, 1.4, 0, 0.2, z0 + 3, 1); part(g, w - 2, 1.2, 1.4, 0, 0.2, z1 - 6, 1);
-    shell(g, new T.CatmullRomCurve3([[z1 - 1.5, 15.5], [z1 - 8, 12.5], [-1, 11], [z0 + 6, 14], [z0 + 3.5, 25], [z0 + 2, h - 1]].map(function(p){ return V(0, p[1], p[0]); })), w - 4.5, 3.4, 10, 2);
-    if (it.throw) shell(g, new T.CatmullRomCurve3([[z0 + 3.6, 21], [z0 + 5.2, 28], [z0 + 3.6, h + 0.6], [z0 - 0.5, h - 3]].map(function(p){ return V(0, p[1], p[0]); })), w - 6.5, 3.2, 7, 3); },   /* a sheepskin over the top of the back */
-  art: function(g, it){ var w = it.w, h = it.h, d = it.d || 1.5, y = it.mount || 54, f = 1.2, mm = Math.min(w, h) * (it.print === 'poster' ? 0.04 : 0.12), z = -d / 2;   /* a framed picture hung at mount */
-    [-1, 1].forEach(function(s){ part(g, w, f, d, 0, s < 0 ? y : y + h - f, 0, 1, {edge: 0.4}); part(g, f, h - 2 * f, d, s * (w / 2 - f / 2), y + f, 0, 1, {edge: 0.4}); });
-    part(g, w - 2 * f, h - 2 * f, 0.3, 0, y + f, z + 0.35, 3, {edge: false});
-    var pm = new T.Mesh(new T.PlaneGeometry(w - 2 * f - 2 * mm, h - 2 * f - 2 * mm), WM); pm.position.set(0, y + h / 2, z + 0.55); pm.receiveShadow = true; pm.userData.role = 2; pm.userData.kind = 'print'; g.add(pm); },
+    shell(g, new T.CatmullRomCurve3([[z1 - 1.5, 15.5], [z1 - 8, 12.5], [-1, 11], [z0 + 6, 14], [z0 + 3.5, 25], [z0 + 2, h - 1.8]].map(function(p){ return V(0, p[1], p[0]); })), w - 4.5, 3.4, 10, 2);
+    if (it.throw) shell(g, new T.CatmullRomCurve3([[z0 + 4.4, 21], [z0 + 5.6, 28], [z0 + 4.4, h - 2.4], [z0 + 2.2, h - 1.3]].map(function(p){ return V(0, p[1], p[0]); })), w - 6.5, 2.6, 7, 3); },   /* a sheepskin down the back cushion, folded over its top edge: inside the footprint and h */
+  art: function(g, it){ var w = it.w, h = it.h, d = it.d || 1.5, y = it.mount || 54, mir = it.print === 'mirror', f = mir ? 2.2 : 1.2, mm = mir ? 0 : Math.min(w, h) * (it.print === 'poster' ? 0.04 : 0.12), z = -d / 2;   /* a framed picture hung at mount, or a mirror in a wider frame */
+    [-1, 1].forEach(function(s){ part(g, w, f, d, 0, s < 0 ? y : y + h - f, 0, 1, {edge: 0.4}); part(g, f, h - 2 * f, d, s * (w / 2 - f / 2), y + f, 0, 1, {edge: 0.4});
+      if (mir){ part(g, w - 2 * f + 0.8, 0.5, d * 0.7, 0, s < 0 ? y + f - 0.4 : y + h - f - 0.1, d * 0.15, 1, {edge: 0.3}); part(g, 0.5, h - 2 * f, d * 0.7, s * (w / 2 - f + 0.15), y + f, d * 0.15, 1, {edge: 0.3}); } });   /* the mirror's inner bead */
+    if (!mir) part(g, w - 2 * f, h - 2 * f, 0.3, 0, y + f, z + 0.35, 3, {edge: false});
+    var pm = new T.Mesh(new T.PlaneGeometry(w - 2 * f - 2 * mm, h - 2 * f - 2 * mm), WM); pm.position.set(0, y + h / 2, z + 0.55); pm.receiveShadow = true; pm.userData.role = 2; pm.userData.kind = mir ? 'mirror' : 'print'; g.add(pm); },   /* kind mirror: the glass, for a reflective finish */
   floorlamp: function(g, it){ var h = it.h || 60, sr = it.shade || 8, sh = sr * 1.3;   /* a tripod lamp, or with arc: a heavy base and an arc that hangs the shade over a seat */
     if (it.arc){ var A = arcLamp(it), rb = Math.min(it.w, it.d) / 2 - 0.5, tr = 0.45;   /* heavy base, a rising stem, one arc whose tip drops into the shade's socket */
       cyl(g, rb, rb * 0.97, 1.8, 0, 0, 0, 1, {seg: 40}); cyl(g, 1.3, 1.1, 1.2, 0, 1.8, 0, 1, {seg: 20}); strut(g, V(0, 1.8, 0), V(0, A.stem, 0), 0.6, tr, 1);
@@ -762,13 +783,24 @@ var BUILD = {
     var hub = h * 0.62, sp = Math.min(it.w, it.d) / 2 - 1;
     [0, 1, 2].forEach(function(i){ var a = i * 2.094 + 0.5; strut(g, V(Math.cos(a) * sp, 0, Math.sin(a) * sp), V(0, hub, 0), 0.55, 0.45, 1); });
     strut(g, V(0, hub - 2, 0), V(0, h - sh + 1, 0), 0.4, 0.4, 1); drum(g, sr, sr, sh, h - sh, 2); },
-  floorplant: function(g, it){ var w = it.w, h = it.h || 48, ph = Math.min(16, w * 0.9), r = rnd(it.seed || 11);   /* a pot, a trunk and leafy heads */
-    cyl(g, w * 0.36, w * 0.46, ph, 0, 0, 0, 1, {seg: 28}); cyl(g, w * 0.43, w * 0.43, 0.3, 0, ph - 1, 0, 9, {seg: 28, noShadow: true});
-    if (it.upright){ plant(g, 0, ph - 1, 0, h - ph, it.seed || 11, true); plant(g, 1.5, ph - 1, -1, (h - ph) * 0.8, (it.seed || 11) + 5, true); return; }
-    if (it.pole){ strut(g, V(0, ph - 1, 0), V(0, h - 3, 0), 1, 0.9, 9); for (var j = 0; j < 8; j++){ var b = j * 2.4, yy = ph + (h - ph - 6) * j / 7;   /* a climber up a moss pole */
-        plant(g, Math.cos(b) * 3, yy - 3, Math.sin(b) * 3, 17 + r() * 5, (it.seed || 11) + j * 7, false); } return; }
-    var n = it.heads || 3, cr = Math.max(12, w * 1.1); for (var i = 0; i < n; i++){ var a = i * 6.283 / n + r(), y = h - cr * (0.55 + r() * 0.3), x = Math.cos(a) * w * 0.35, z = Math.sin(a) * w * 0.35;   /* stems to a crown of leafy heads */
-      strut(g, V(0, ph - 1, 0), V(x, y, z), 0.5, 0.35, 6); plant(g, x, y - cr * 0.15, z, cr, (it.seed || 11) + i * 13, false); plant(g, x * 1.6, y - cr * 0.45, z * 1.6, cr * 0.8, (it.seed || 11) + i * 17 + 3, false); } },
+  floorplant: function(g, it){ var w = it.w, h = it.h || 48, R = w / 2, r = rnd(it.seed || 11), geos = [], lim = {x: 0, z: 0, r: R, top: h}, i, j, n, a, ll, y;   /* w is the canopy's spread and h its top; the pot scales from w */
+    var pr = Math.max(2.5, Math.min(8, R * (it.upright || it.pole ? 0.62 : 0.5))), ph = Math.min(16, pr * 1.9);
+    cyl(g, pr * 0.8, pr, ph, 0, 0, 0, 1, {seg: 28}); cyl(g, pr * 0.93, pr * 0.93, 0.3, 0, ph - 1, 0, 9, {seg: 28, noShadow: true});
+    if (it.upright){ n = 10 + Math.round(R); for (i = 0; i < n; i++){ var f = i ? 0.45 + r() * 0.5 : 1, o = r() * pr * 0.55; ll = (h - ph + 1) * f; a = r() * 6.283;   /* sword leaves: the tallest plumb at h, shorter ones leaning out */
+        leaf(geos, V(Math.cos(a) * o, ph - 1, Math.sin(a) * o), ll, Math.min(3.4, ll * 0.14), a + (r() - 0.5), (1.05 - f) * 0.45 + r() * 0.08, r() * 0.3, 0x5d7a45, 0.7 + r() * 0.45, lim); } }
+    else if (it.pole){ var top = h - 3; strut(g, V(0, ph - 1, 0), V(0, top, 0), 1, 0.9, 9, [false, true]); ll = Math.min(7, R * 0.8);   /* a climber on a moss pole: leaves spiral up it, the top ones and a few vines droop */
+      n = Math.round((top - ph) / 0.45); for (i = 0; i <= n; i++){ y = ph + 1 + (top - ph) * i / n; a = i * 2.4 + r() * 0.6; var L = ll * (0.6 + r() * 0.5);
+        leaf(geos, V(Math.cos(a) * 1.1, y, Math.sin(a) * 1.1), L, L * 0.7, a + (r() - 0.5) * 0.6, 0.7 + r() * 0.7, 0.8 + r() * 0.9 + (y > top - 8 ? 0.7 : 0), 0x4e7440, 0.68 + r() * 0.5, lim); }
+      for (j = 0; j < 5; j++){ var a0 = j * 1.257 + r() * 0.6, up = j % 2 === 0, y0 = up ? top - 1 - r() * 6 : ph, r0 = up ? 1.2 : pr * 0.9, m = 7;   /* vines: from high on the pole, and over the pot's rim */
+        for (i = 0; i < m; i++){ var k = i / (m - 1), rr = r0 + (R - 1.2 - r0) * Math.sqrt(k); y = y0 + 1 - (up ? 16 : ph - 2) * k * k;
+          leaf(geos, V(Math.cos(a0) * rr, y, Math.sin(a0) * rr), ll * (0.7 - k * 0.25), ll * 0.44, a0 + (r() - 0.5) * 1.2, 1.5 + r() * 0.5, 0.7 + r() * 0.6, 0x4e7440, 0.68 + r() * 0.5, lim); } } }
+    else { n = it.heads || 3; var cr = Math.min(R * 0.62, (h - ph) * 0.36), cv = Math.min(cr * 1.1, (h - ph) * 0.3), hr = Math.max(0, R - cr) * 0.8;   /* stems up to leafy heads; their leaves sit on each head's round shell, facing out */
+      for (i = 0; i < n; i++){ a = i * 6.283 / n + r() * 0.8; y = h - cv * (1 + r() * 0.35); var hx = Math.cos(a) * hr, hz = Math.sin(a) * hr, m = Math.round(30 + cr * 5);
+        strut(g, V((r() - 0.5) * pr * 0.4, ph - 1, (r() - 0.5) * pr * 0.4), V(hx, y, hz), Math.min(0.7, pr * 0.12), 0.3, 6);
+        for (j = 0; j < m; j++){ var u = r() * 2 - 1, t = r() * 6.283, sh = 0.35 + 0.6 * Math.sqrt(r()), dx = Math.sqrt(1 - u * u) * Math.cos(t), dz = Math.sqrt(1 - u * u) * Math.sin(t);
+          ll = cr * (0.38 + r() * 0.3);
+          leaf(geos, V(hx + dx * cr * sh * 0.8, y + u * cv * sh * 0.8, hz + dz * cr * sh * 0.8), ll, ll * 0.46, Math.atan2(dx, dz) + (r() - 0.5) * 0.7, Math.acos(u) * 0.85 + 0.15 + (r() - 0.5) * 0.4, 0.3 + r() * 0.8, 0x4e7440, 0.66 + r() * 0.5, lim); } } }
+    foliage(g, geos); },
   bed: function(g, it){ var w = it.w, d = it.d, h = it.h || 22, fr = Math.max(8, h - 9);
     part(g, w, fr, d, 0, 0, 0, 1); part(g, w - 1.5, h - fr + 1, d - 3, 0, fr - 1, 1.5, 3, {r: 2}); part(g, w, it.hb || 36, 2, 0, 0, -d / 2 + 1, 1);
     [-1, 1].forEach(function(s){ if (w > 48 || s < 0) part(g, w > 48 ? w * 0.42 : w * 0.6, 5, 14, w > 48 ? s * w * 0.23 : 0, h, -d / 2 + 11, 3, {r: 2.4}); });
@@ -789,7 +821,7 @@ var BUILD = {
     if (it.round){ cyl(g, w / 2, w / 2, 1.5, 0, h - 1.5, 0, 1, {seg: 40}); for (var i = 0; i < 4; i++){ var a = i * 1.571 + 0.785, sp = w / 2 - 1.2;   /* a round top on four splayed legs */
         strut(g, V(Math.cos(a) * sp, 0, Math.sin(a) * sp), V(Math.cos(a) * sp * 0.62, h - 1.5, Math.sin(a) * sp * 0.62), 0.6, 0.5, 1); } return; }
     part(g, w, 1.5, d, 0, h - 1.5, 0, 1, {r: 0.35}); legs(g, w, d, h - 1.5, 2, lt); },
-  chair: function(g, it){ chair(g, 0, 1); },
+  chair: function(g, it){ var c = new T.Group(); chair(c, 0, 1, it.w, it.d, it.h); c.rotation.y = Math.PI; g.add(c); },   /* its back to the wall behind it */
   bookshelf: function(g, it){ var w = it.w, d = it.d, h = it.h || 60, t = 0.75, n = Math.max(2, Math.round(h / 12)), seed = 7, bi = 0;
     part(g, t, h, d, -w / 2 + t / 2, 0, 0, 1); part(g, t, h, d, w / 2 - t / 2, 0, 0, 1); part(g, w - 2 * t, h, 0.3, 0, 0, -d / 2 + 0.15, 1, {edge: false});
     for (var i = 0; i <= n; i++){ var y = i === n ? h - t : (h - t) * i / n; part(g, w - 2 * t, t, d - 0.3, 0, y, 0.15, 1);
@@ -814,12 +846,12 @@ var BUILD = {
     if (it.tv){ var tw = it.tv * 0.872, th = it.tv * 0.49; part(g, tw * 0.28, 0.8, 8, 0, h, -d / 2 + 6, 5, {r: 0.3}); part(g, 2, 3, 1.5, 0, h, -d / 2 + 5, 5); part(g, tw, th, 1.2, 0, h + 3, -d / 2 + 4.5, 5, {edge: 0.8}); } },
   stands: function(g, it){ var w = it.w, h = it.h || 28, n = Math.max(2, Math.round(w / 30));   /* plant stands with their pots and plants */
     for (var i = 0; i < n; i++){ var x = -w / 2 + (i + 0.5) * w / n, sh = i % 2 ? h * 0.72 : h, st = new T.Group(); part(st, 11, 1, 11, 0, sh - 1, 0, 1); legs(st, 11, 11, sh - 1, 1, 1);
-      cyl(st, 3.2, 4.2, 7, 0, sh, 0, 2, {seg: 24}); cyl(st, 3.9, 3.9, 0.3, 0, sh + 6.3, 0, 9, {seg: 24, noShadow: true}); plant(st, 0, sh + 6.5, 0, i % 2 ? 22 : 16, 31 + i * 7, i % 2 === 1);
+      cyl(st, 3.2, 4.2, 7, 0, sh, 0, 2, {seg: 24}); cyl(st, 3.9, 3.9, 0.3, 0, sh + 6.3, 0, 9, {seg: 24, noShadow: true}); plant(st, 0, sh + 6.5, 0, i % 2 ? 22 : 16, 31 + i * 7, i % 2 === 1, it.d / 2 + 1);
       st.position.x = x; g.add(st); } },
   petbed: function(g, it){ var w = it.w, d = it.d, h = it.h || 8; part(g, w, 3, d, 0, 0, 0, 1, {r: 1.2}); part(g, w, h - 2, 5, 0, 2, -d / 2 + 2.5, 1, {r: 2.4}); [-1, 1].forEach(function(s){ part(g, 5, h - 3, d - 4, s * (w / 2 - 2.5), 2, 2, 1, {r: 2.3}); });
     part(g, w - 9, 2.5, d - 6, 0, 2.5, 2.5, 2, {r: 1.2}); },
-  fireplace: function(g, it){ var w = it.w, d = it.d, h = it.h || 52, fw = it.face || w * 0.68, fh = it.faceH || 38, lw = (w - fw) / 2, ow = fw * 0.62, oh = fh * 0.66;   /* surround, mantel, brick face, firebox, screen, hearth */
-    [-1, 1].forEach(function(s){ part(g, lw, h - 2, d, s * (w / 2 - lw / 2), 0, 0, 1); }); part(g, fw, h - 2 - fh, d, 0, fh, 0, 1); part(g, w + 4, 2, d + 3, 0, h - 2, 1.5, 1, {r: 0.3});
+  fireplace: function(g, it){ var w = it.w - 3, d = it.d, h = it.h || 52, fw = Math.min(it.face || w * 0.7, w - 4), fh = it.faceH || 38, lw = (w - fw) / 2, ow = fw * 0.62, oh = fh * 0.66;   /* surround, mantel, brick face, firebox, screen, hearth */
+    [-1, 1].forEach(function(s){ part(g, lw, h - 2, d, s * (w / 2 - lw / 2), 0, 0, 1); }); part(g, fw, h - 2 - fh, d, 0, fh, 0, 1); part(g, it.w, 2, d + 3, 0, h - 2, 1.5, 1, {r: 0.3});   /* the mantel is the full w; its lip reaches over the hearth */
     part(g, fw, fh, 1.5, 0, 0, -d / 2 + 0.75, 2); part(g, ow, oh, 0.5, 0, 2, -d / 2 + 1.75, 5, {edge: 0.4});
     [[ow + 1.5, 0.8, 0, oh + 2], [0.8, oh, -ow / 2 - 0.4, 2], [0.8, oh, ow / 2 + 0.4, 2]].forEach(function(b){ part(g, b[0], b[1], 0.5, b[2], b[3], -d / 2 + 2.1, 8, {edge: false}); });
     if (it.front) part(g, it.fw || w, 0.5, it.front, 0, 0, d / 2 + it.front / 2, 2, {noShadow: true, edge: 0.4, kind: 'stone'}); },
@@ -1115,26 +1147,65 @@ if (HASH.debug) window.ROOM = {ev: function(src){ return eval(src); },   /* debu
   snapPhoto: function(i, name, full){ var m0 = {w: MV.w, h: MV.h}; enterPhoto(i); MV = {w: 2000, h: 1500}; photoAspect = 4 / 3; renderer.setPixelRatio(1); renderer.setSize(2000, 1500, false); photoCam(PH[i]); cutTargets(); SEG.forEach(function(sg){ sg.cut = sg.target; applyCut(sg); }); renderer.shadowMap.needsUpdate = true;
     if (full){ composer.setPixelRatio(1); composer.setSize(2000, 1500); composer.passes[0].camera = gtao.camera = persp; composer.render(); composer.passes[0].camera = gtao.camera = mcam; } else render3d();
     return new Promise(function(res){ mc.toBlob(function(b){ fetch('http://127.0.0.1:8794/' + name + '.png', {method: 'POST', body: b}).then(function(){ MV = m0; renderer.setPixelRatio(DPR); exitPhoto(); sizeModel(); res(name); }); }, 'image/png'); }); }};   /* local debugging only */
-/* test only (#debug&test): the model must agree with the plan the checks read. Every part of a piece stays over its footprint or a reach the checks
-   declare (an arc lamp's shade), and a declared reach holds its part. test.py reads every option's findings from the pre#audit it writes. */
-function audit(){ var out = [], v = new T.Vector3(), inv = new T.Matrix4(), t = 1.5; FURN.updateMatrixWorld(true);
-  Object.keys(OBJ).forEach(function(k){ var it = ITEMS[k], g = OBJ[k], sr = it.shade || 8, far = 0, sb = null;
-    var zones = [[-it.w / 2, it.w / 2, -it.d / 2, it.d / 2]]; if (it.arc) zones.push([-sr, sr, 0, it.arc + sr]);   /* item-local plan: x across, z toward the front; an arc lamp spans base to shade */
+/* test only (#debug&test): the model must agree with itself and with the plan the checks read. test.py reads every option's findings from the pre#audit it writes.
+   outside: every part stays over its footprint or a zone a check sees (an arc lamp's reach, a desk chair's front clearance, a hearth). reach: an arc lamp's shade hangs at the arc's end.
+   ground: a floor piece stands on the floor and a hung one on its wall, and every part joins the rest. tall: nothing rises past topOf(it). thin: a tube or strut ends on
+   another part (or the floor) and passes through no other part's solid on the way. */
+function audit(){ var out = [], v = new T.Vector3(), q = new T.Vector3(), inv = new T.Matrix4(), t = 1.5; world.updateMatrixWorld(true);
+  var pieces = Object.keys(OBJ).map(function(k){ return {g: OBJ[k], it: ITEMS[k]}; }).concat(FIXOBJ.map(function(F){ return {g: F.g, it: F.f}; }));
+  pieces.forEach(function(P){ var it = P.it, g = P.g, k = it.id || it.name, w = it.w, d = it.d || it.w, sr = it.shade || 8, far = 0, sb = null, ms = [];
+    var zones = [[-w / 2, w / 2, -d / 2, d / 2]];   /* item-local plan: x across, z toward the front */
+    if (it.arc) zones.push([-sr, sr, 0, it.arc + sr]);   /* an arc lamp spans base to shade; evaluate() keeps the shade in the room and clear of what it hangs over */
+    if (it.type === 'desk' && it.chair !== false && it.front) zones.push([-w / 2, w / 2, d / 2, d / 2 + it.front]);   /* the desk's chair sits in the front clearance the checks keep free */
+    if (it.type === 'fireplace' && it.front) zones.push([-(it.fw || w) / 2, (it.fw || w) / 2, d / 2, d / 2 + it.front]);   /* the hearth: the zone kept clear */
     inv.copy(g.matrixWorld).invert();
     g.traverse(function(m){ if (!m.isMesh) return; for (var n = m; n; n = n.parent) if (n === g.userData.frame) return;
-      var P = m.geometry.attributes.position, shade = m.userData.kind === 'shade';
-      for (var i = 0; i < P.count; i++){ v.fromBufferAttribute(P, i).applyMatrix4(m.matrixWorld).applyMatrix4(inv);
-        far = Math.max(far, Math.min.apply(null, zones.map(function(b){ return Math.hypot(Math.max(b[0] - v.x, 0, v.x - b[1]), Math.max(b[2] - v.z, 0, v.z - b[3])); })));
-        if (shade){ sb = sb || [1e9, -1e9, 1e9, -1e9]; sb[0] = Math.min(sb[0], v.x); sb[1] = Math.max(sb[1], v.x); sb[2] = Math.min(sb[2], v.z); sb[3] = Math.max(sb[3], v.z); } } });
-    if (far > t) out.push({id: k, rule: 'outside', text: it.name + ' draws a part ' + far.toFixed(1) + '″ past its footprint, where the checks can’t see it'});
+      var Pa = m.geometry.attributes.position, shade = m.userData.kind === 'shade', b = [1e9, 1e9, 1e9, -1e9, -1e9, -1e9];
+      for (var i = 0; i < Pa.count; i++){ v.fromBufferAttribute(Pa, i).applyMatrix4(m.matrixWorld).applyMatrix4(inv);
+        far = Math.max(far, Math.min.apply(null, zones.map(function(z){ return Math.hypot(Math.max(z[0] - v.x, 0, v.x - z[1]), Math.max(z[2] - v.z, 0, v.z - z[3])); })));
+        b[0] = Math.min(b[0], v.x); b[1] = Math.min(b[1], v.y); b[2] = Math.min(b[2], v.z); b[3] = Math.max(b[3], v.x); b[4] = Math.max(b[4], v.y); b[5] = Math.max(b[5], v.z); }
+      if (shade) sb = sb ? [Math.min(sb[0], b[0]), Math.max(sb[1], b[3]), Math.min(sb[2], b[2]), Math.max(sb[3], b[5])] : [b[0], b[3], b[2], b[5]];
+      var geo = m.geometry, sh = m.userData.thin ? 'thin' : geo.type === 'CylinderGeometry' ? 'cyl' : geo.type === 'BoxGeometry' ? 'box' : 'aabb';
+      if (sh === 'box' && !geo.boundingBox) geo.computeBoundingBox();
+      ms.push({m: m, b: b, sh: sh, inv: new T.Matrix4().copy(m.matrixWorld).invert(), pts: m.userData.thin ? m.userData.thin.pts.map(function(p){ return p.clone().applyMatrix4(m.matrixWorld); }) : null}); });
+    if (!ms.length) return;
+    function say(rule, text){ if (!out.some(function(o){ return o.id === k && o.text === it.name + text; })) out.push({id: k, rule: rule, text: it.name + text}); }   /* a pair of side frames says it once */
+    if (far > t) say('outside', ' draws a part ' + far.toFixed(1) + '″ past its footprint, where the checks can’t see it');
     if (it.arc && sb){ var sx = (sb[0] + sb[1]) / 2, sz = (sb[2] + sb[3]) / 2;
-      if (Math.abs(sx) > 1 || Math.abs(sz - it.arc) > 1) out.push({id: k, rule: 'reach', text: it.name + '’s shade hangs ' + sz.toFixed(1) + '″ in front of its base, not at the arc’s end (' + it.arc + '″)'}); } });
+      if (Math.abs(sx) > 1 || Math.abs(sz - it.arc) > 1) say('reach', '’s shade hangs ' + sz.toFixed(1) + '″ in front of its base, not at the arc’s end (' + it.arc + '″)'); }
+    var lo = Math.min.apply(null, ms.map(function(e){ return e.b[1]; })), hi = Math.max.apply(null, ms.map(function(e){ return e.b[4]; })), back = Math.min.apply(null, ms.map(function(e){ return e.b[2]; }));
+    if (it.mount){ if (Math.abs(back + d / 2) > 0.5) say('ground', (back > -d / 2 ? ' hangs ' + (back + d / 2).toFixed(1) + '″ off its wall' : ' sinks ' + (-d / 2 - back).toFixed(1) + '″ into its wall')); }
+    else if (Math.abs(lo) > 0.5) say('ground', lo > 0 ? ' floats ' + lo.toFixed(1) + '″ off the floor' : ' sinks ' + (-lo).toFixed(1) + '″ into the floor');
+    var seen = ms.map(function(e){ return it.mount ? e.b[2] <= -d / 2 + 0.5 : e.b[1] <= 0.5; }), grow = true;   /* every part joins, through touching parts, the floor (or its wall) */
+    function touch(a, c){ for (var i = 0; i < 3; i++) if (a.b[i] > c.b[i + 3] + 0.3 || c.b[i] > a.b[i + 3] + 0.3) return false; return true; }
+    while (grow){ grow = false; ms.forEach(function(e, i){ if (!seen[i] && ms.some(function(c, j){ return seen[j] && touch(e, c); })){ seen[i] = grow = true; } }); }
+    var loose = ms.filter(function(e, i){ return !seen[i]; });
+    if (loose.length) say('ground', ' has ' + (loose.length > 1 ? loose.length + ' parts' : 'a part') + ' joined to nothing, at ' + loose[0].b[1].toFixed(1) + '–' + loose[0].b[4].toFixed(1) + '″ up');
+    var top = topOf(it); if (hi > top + 0.5) say('tall', ' draws ' + (hi - top).toFixed(1) + '″ above its height (' + fmtIn(top) + ')');
+    function dist(e, p, shrink){ /* p (world) to a part: negative inside it, by at least shrink */
+      if (e.sh === 'thin'){ var best = 1e9; for (var i = 0; i + 1 < e.pts.length; i++) best = Math.min(best, segDist(p, e.pts[i], e.pts[i + 1])); return best - e.m.userData.thin.r; }
+      if (e.sh === 'aabb'){ q.copy(p).applyMatrix4(inv); return Math.hypot(Math.max(e.b[0] - q.x, 0, q.x - e.b[3]), Math.max(e.b[1] - q.y, 0, q.y - e.b[4]), Math.max(e.b[2] - q.z, 0, q.z - e.b[5])); }
+      q.copy(p).applyMatrix4(e.inv);
+      if (e.sh === 'box'){ var B = e.m.geometry.boundingBox, ox = Math.max(B.min.x - q.x, q.x - B.max.x), oy = Math.max(B.min.y - q.y, q.y - B.max.y), oz = Math.max(B.min.z - q.z, q.z - B.max.z);
+        return ox < 0 && oy < 0 && oz < 0 ? Math.max(ox, oy, oz) : Math.hypot(Math.max(ox, 0), Math.max(oy, 0), Math.max(oz, 0)); }
+      var pr = e.m.geometry.parameters, hh = pr.height / 2, ry = pr.radiusBottom + (pr.radiusTop - pr.radiusBottom) * (Math.max(-hh, Math.min(hh, q.y)) + hh) / pr.height, dy = Math.abs(q.y) - hh, dr = Math.hypot(q.x, q.z) - ry;
+      return dy < 0 && dr < 0 ? Math.max(dy, dr) : Math.hypot(Math.max(dy, 0), Math.max(dr, 0)); }
+    ms.forEach(function(e){ if (e.sh !== 'thin') return; var th = e.m.userData.thin, pts = e.pts, L = [0], i;
+      for (i = 1; i < pts.length; i++) L.push(L[i - 1] + pts[i].distanceTo(pts[i - 1]));
+      [0, pts.length - 1].forEach(function(j, s){ if (th.free && th.free[s]) return; var p = pts[j];   /* each end lands on something */
+        if (p.y - th.r > 0.5 && !ms.some(function(c){ return c !== e && dist(c, p) <= th.r + 0.3; })) say('thin', ' has a ' + (e.m.geometry.type === 'TubeGeometry' ? 'tube' : 'rod') + ' that ends in mid-air, ' + p.clone().applyMatrix4(inv).y.toFixed(1) + '″ up'); });
+      var hit = null, M = Math.min(2.5, L[L.length - 1] / 3);   /* the last 2.5″ of each end may sink into what it joins (a stem into its socket) */
+      for (i = 0; i + 1 < pts.length && !hit; i++) for (var f = 0; f < 1 && !hit; f += 0.25){ var s = L[i] + (L[i + 1] - L[i]) * f; if (s < M || s > L[L.length - 1] - M) continue;
+        var p2 = pts[i].clone().lerp(pts[i + 1], f); if (ms.some(function(c){ return c !== e && (c.sh === 'box' || c.sh === 'cyl') && dist(c, p2) < -0.15; })) hit = p2.applyMatrix4(inv); }
+      if (hit) say('thin', ' runs a ' + (e.m.geometry.type === 'TubeGeometry' ? 'tube' : 'rod') + ' through another of its parts, ' + hit.y.toFixed(1) + '″ up'); }); });
   return out; }
+function segDist(p, a, b){ var ab = b.clone().sub(a), l2 = ab.lengthSq(), k = l2 ? Math.max(0, Math.min(1, p.clone().sub(a).dot(ab) / l2)) : 0; return p.distanceTo(a.clone().add(ab.multiplyScalar(k))); }
+function fmtIn(v){ return Math.round(v * 10) / 10 + '″'; }
 if (HASH.debug && HASH.frame && OBJ[HASH.frame]){ var fb = new T.Box3().setFromObject(OBJ[HASH.frame]), fc = fb.getCenter(V(0, 0, 0)), fs = fb.getSize(V(0, 0, 0));   /* #frame=<id>: a close-up of one piece, for the visual sweep */
   view.tx = fc.x; view.ty = fc.y; view.tz = fc.z; view.r = Math.max(fs.x, fs.y, fs.z) * 0.62 + 4; if (HASH.el) view.el = +HASH.el * Math.PI / 180; curView = null; SEG.forEach(function(sg){ sg.target = sg.cut = 0.5; applyCut(sg); }); dirty3 = true; }
 if (HASH.debug){ ROOM.audit = audit; if (HASH.test){ var c0 = cur, all = [];
-  LAYOUTS.forEach(function(L, i){ setLayout(i); audit().forEach(function(f){ f.layout = i + 1; all.push(f); }); }); setLayout(c0);
-  var pre = document.createElement('pre'); pre.id = 'audit'; pre.textContent = JSON.stringify(all); document.body.appendChild(pre); } }
+  var checks = []; LAYOUTS.forEach(function(L, i){ setLayout(i); audit().forEach(function(f){ f.layout = i + 1; all.push(f); }); EVAL[i].lines.forEach(function(l){ checks.push({layout: i + 1, level: l.level, text: l.text}); }); }); setLayout(c0);
+  [['audit', all], ['checks', checks]].forEach(function(x){ var pre = document.createElement('pre'); pre.id = x[0]; pre.textContent = JSON.stringify(x[1]); document.body.appendChild(pre); }); } }   /* checks: what the panel says, for a fixture's expect.json */
 requestAnimationFrame(loop);
 })();
 </script>

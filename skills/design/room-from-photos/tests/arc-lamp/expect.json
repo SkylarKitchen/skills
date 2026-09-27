@@ -1,0 +1,5 @@
+{
+  "1": {"not": ["Arc lamp’s shade hangs into the armchair"]},
+  "2": {"not": ["Arc lamp’s shade hangs into the armchair"]},
+  "3": {"has": ["Arc lamp’s shade hangs into the bookshelf"]}
+}
