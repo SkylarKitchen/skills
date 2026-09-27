@@ -1,0 +1,509 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Assembly Manual Starter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+:root{--paper:#ffffff;--ink:#141414;--ink-2:#5f5f5f;--ink-3:#8c8c8c;--rule:#e3e3e3;--callout:#f4f4f4;--accent:#f28c1e;--mono:"Geist Mono",ui-monospace,Menlo,monospace}
+html,body{height:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:Geist,-apple-system,"Helvetica Neue",Arial,sans-serif;font-size:15px;line-height:1.45;overflow:hidden;-webkit-text-size-adjust:100%}
+.app{height:100%;display:flex;flex-direction:column}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:11px 16px 8px;border-bottom:1px solid var(--rule)}
+header h1{font-size:15px;font-weight:600;margin:0;letter-spacing:-.01em}
+header .sub{display:block;font-size:12.5px;color:var(--ink-2);margin-top:1px}
+header .where{font-family:var(--mono);font-size:12px;color:var(--ink-2);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.stage{position:relative;flex:1;min-height:200px;overflow:hidden}
+#c{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#c:active{cursor:grabbing}
+.callout{position:absolute;left:12px;top:12px;max-width:calc(100% - 120px);background:var(--callout);border:1px solid var(--rule);border-radius:2px;padding:7px 9px 6px}
+.callout[hidden]{display:none}
+.callout .h{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);margin:0 0 5px}
+.callout ul{list-style:none;margin:0;padding:0;display:flex;gap:10px;flex-wrap:wrap;max-width:300px}
+.callout li{width:54px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.callout li:active img{border-color:var(--accent)}
+.callout .th{position:relative;width:46px;height:46px}
+.callout img{width:46px;height:46px;display:block;background:#fff;border:1px solid var(--rule);border-radius:2px}
+.callout .q{position:absolute;right:-6px;bottom:-4px;font-family:var(--mono);font-size:10.5px;background:var(--ink);color:#fff;border-radius:2px;padding:1px 4px;line-height:1.3}
+.callout .nm{font-size:10.5px;line-height:1.2;text-align:center;color:var(--ink-2);text-wrap:balance}
+.replay{position:absolute;right:12px;top:12px;height:30px;padding:0 10px;font-size:12.5px;border:1px solid var(--rule);background:var(--paper);color:var(--ink-2)}
+.replay[hidden]{display:none}
+#dims{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.dim,.note,.mark{position:absolute;left:0;top:0;opacity:0;transition:opacity .35s;will-change:transform;white-space:nowrap}
+.dim,.note{font-family:var(--mono);font-size:11px;line-height:1.2;background:var(--paper);border:1px solid var(--ink);color:var(--ink);padding:1px 5px;border-radius:2px}
+.note{border-color:var(--rule);color:var(--ink-2)}
+.mark{width:20px;height:20px;border-radius:50%;background:var(--ink);color:#fff;font:500 11px/20px var(--mono);text-align:center;box-shadow:0 0 0 1.5px #fff,0 0 0 2.5px var(--ink)}
+.mark i{position:absolute;left:50%;top:50%;height:1px;background:var(--ink);transform-origin:0 50%;box-shadow:0 1px 0 #fff}
+.dim.on,.note.on,.mark.on{opacity:1}
+.plan{position:absolute;right:12px;top:52px;width:84px;height:84px;border:1px solid var(--rule);border-radius:2px;pointer-events:none}
+.plan span{position:absolute;left:5px;top:3px;font-family:var(--mono);font-size:10px;color:var(--ink-3)}
+.bubble{position:absolute;right:12px;bottom:12px;width:116px;height:116px;pointer-events:none;display:none;overflow:hidden}
+.bubble.on{display:block}
+.bubble i{position:absolute;inset:0;border-radius:50%;box-shadow:0 0 0 90px var(--paper);border:1px solid var(--ink);transform-origin:50% 50%}
+.leader,.ring{position:absolute;left:0;top:0;pointer-events:none;display:none}
+.leader{height:1px;background:var(--ink);transform-origin:0 50%}
+.ring{width:18px;height:18px;border-radius:50%;border:1px solid var(--ink);box-shadow:0 0 0 1px #fff inset}
+.bubble.on ~ .leader,.bubble.on ~ .ring{display:block}
+.scale{position:absolute;left:12px;bottom:12px;display:flex;align-items:center;gap:6px;font:11px var(--mono);color:var(--ink);pointer-events:none}
+.scale span{background:var(--paper);padding:0 3px;border-radius:2px}
+.scale i{display:block;height:1px;background:var(--ink);position:relative}
+.scale i::before,.scale i::after{content:"";position:absolute;top:-3px;width:1px;height:7px;background:var(--ink)}
+.scale i::before{left:0}.scale i::after{right:0}
+.progress{height:14px;position:relative;border-top:1px solid var(--rule)}
+.progress i{position:absolute;left:0;top:-1px;height:2px;background:var(--ink);transition:width .5s cubic-bezier(.22,1,.36,1)}
+.progress .ticks{position:absolute;left:0;right:0;top:0;height:14px;display:flex}
+.progress .ticks b{flex:1;position:relative}
+.progress .ticks b::after{content:"";position:absolute;right:0;top:0;width:1px;height:5px;background:var(--rule)}
+.progress .ticks b.done::after{background:var(--ink)}
+.sheet{touch-action:pan-y;padding:10px 16px 6px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 14px;align-items:start;max-height:36%;overflow-y:auto;overscroll-behavior:contain}
+.num{font-size:44px;font-weight:600;line-height:.95;letter-spacing:-.03em;font-variant-numeric:tabular-nums;min-width:1.4ch;color:var(--ink)}
+.num small{font-size:13px;font-weight:500;letter-spacing:0;color:var(--ink-2);display:block;margin-top:2px}
+.body{min-width:0;transition:opacity .16s}
+.title{font-weight:600;font-size:16.5px;margin:3px 0 2px;text-wrap:balance;letter-spacing:-.01em}
+.text{margin:0;max-width:64ch}
+.text:empty{display:none}
+.acts{margin:6px 0 0;padding:0;list-style:none;display:grid;gap:5px;max-width:64ch}
+.acts li{display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px;align-items:start}
+.acts b{width:20px;height:20px;border-radius:50%;background:var(--ink);color:#fff;font:500 11px/20px var(--mono);text-align:center;margin-top:1px}
+.acts:empty{display:none}
+.meta{font-family:var(--mono);font-size:12px;color:var(--ink-2);margin-top:6px;font-variant-numeric:tabular-nums}
+.meta:empty{display:none}
+.tip{margin:6px 0 0;font-size:13.5px;color:var(--ink-2);max-width:64ch;padding-left:10px;border-left:2px solid var(--rule)}
+.tip:empty{display:none}
+.inv{margin:8px 0 0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 14px;font-size:13.5px}
+.inv li{display:flex;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid var(--rule);min-width:0}
+.inv img{width:34px;height:34px;flex:none;border:1px solid var(--rule);border-radius:2px;background:#fff}
+.inv .q{font-family:var(--mono);color:var(--ink-2);min-width:3.2em;font-variant-numeric:tabular-nums;font-size:12px}
+.inv .nm{min-width:0}
+.grp{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin:12px 0 0}
+.cal{margin:8px 0 0;padding:0;list-style:none;font-size:14px}
+.cal li{display:flex;gap:10px;padding:3px 0;border-bottom:1px solid var(--rule)}
+.cal .d{font-family:var(--mono);color:var(--ink-2);min-width:7.6em;font-variant-numeric:tabular-nums;font-size:12.5px;padding-top:1px}
+.nav{display:grid;grid-template-columns:1fr 2fr;gap:8px;padding:8px 16px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--rule)}
+button{font:inherit;font-weight:500;height:52px;border-radius:2px;border:1px solid var(--ink);background:var(--paper);color:var(--ink);cursor:pointer;padding:0 14px;-webkit-tap-highlight-color:transparent}
+button.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+button:disabled{opacity:.35;cursor:default}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:430px){body{font-size:14.5px}.tip{font-size:13px}.title{font-size:16px}}
+@media (prefers-reduced-motion:reduce){.progress i,.dim,.note,.mark,.body{transition:none}}
+@media (max-width:759px){.callout{padding:5px 6px 4px;max-width:calc(100% - 132px)}.callout .h{font-size:9.5px;margin:0 0 3px}.callout ul{flex-wrap:nowrap;overflow-x:auto;gap:6px;max-width:none;scrollbar-width:none;padding-bottom:2px}.callout ul::-webkit-scrollbar{display:none}.callout li{flex:0 0 40px;width:40px}.callout .th,.callout img{width:32px;height:32px;box-sizing:border-box}.callout .q{font-size:9px;padding:0 3px}.callout .nm{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40px}
+  .callout.more::after{content:"";position:absolute;right:1px;top:1px;bottom:1px;width:28px;background:linear-gradient(to right,rgba(244,244,244,0),var(--callout));pointer-events:none}}
+@media (min-width:760px){.sheet{max-height:34%}.callout ul{max-width:420px}.bubble{width:150px;height:150px}}
+</style>
+<div class="app">
+  <header>
+    <div><h1 id="h1"></h1><span class="sub" id="sub"></span></div>
+    <span class="where" id="where"></span>
+  </header>
+  <div class="stage">
+    <canvas id="c"></canvas>
+    <div id="dims"></div>
+    <div class="callout" id="callout" hidden><p class="h">Parts for this step · tap one to find it</p><ul id="parts"></ul></div>
+    <div class="plan"><span>Plan</span></div>
+    <div class="bubble" id="bubble"><i></i></div><div class="leader" id="leader"></div><div class="ring" id="ring"></div>
+    <div class="scale"><i id="scaleBar"></i><span id="scaleTxt">1 ft</span></div>
+    <button class="replay" id="replay" type="button">Replay</button>
+  </div>
+  <div class="progress"><i id="bar"></i><div class="ticks" id="ticks"></div></div>
+  <div class="sheet" id="sheet">
+    <div class="num" id="num"></div>
+    <div class="body" id="body">
+      <h2 class="title" id="title"></h2>
+      <p class="text" id="text"></p>
+      <ol class="acts" id="acts"></ol>
+      <div class="meta" id="meta"></div>
+      <p class="tip" id="tip"></p>
+      <div id="extra"></div>
+    </div>
+  </div>
+  <div class="nav">
+    <button id="prev" type="button">Back</button>
+    <button id="next" type="button" class="primary">Next step</button>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ======================================================================
+   CONFIG: everything project-specific that is data lives here.
+   Scene geometry, part builders (P) and reg() calls live in the
+   PROJECT SCENE block further down (they need the helpers). Units: feet.
+   ====================================================================== */
+var CONFIG = {
+  title: 'Bookshelf manual',
+  subtitle: 'Three-shelf unit, 3 × 4 ft',
+  date: 'Sep 26',                       /* shown top right: "Sep 26 · 2 of 4" */
+  storageKey: 'shelf.step',             /* localStorage key for the last page; unique per manual */
+  accent: 0x1f4fd8,                     /* dark: arrows, plan frame, outline flash, CSS --accent */
+  fill: 0xa6c0f6,                       /* pale: this step's parts and thumbnails (ink edges stay visible) */
+  view: [1, 0.8, 1.25],                 /* default three-quarter view direction */
+  plan: null,                           /* plan inset {c:[x,z], r}; null = derived from the scene's bounds */
+  figure: [-2.2, 0.6],                  /* Modulor scale figure [x, z, rotY?], a flat cut-out facing the view unless rotY is given; null for none */
+  CAM: {                                /* presets: c centre, r half-height (ft); optional v (view), walls ({h, sides}), cut ([keys]) */
+    overview: {c: [-0.5, 3.2, 0.3], r: 4.4},   /* wide enough for the scale figure's raised hand */
+    base:     {c: [0, 1.4, 0], r: 2.7},
+    back:     {c: [0, 2.6, -0.5], r: 3.7, v: [-0.9, 0.7, -1.2], walls: {h: 0.6, sides: ['N', 'W']}},
+    joint:    {c: [1.0, 0.7, 0.2], r: 1.3}
+  },
+  NAMES: { side: 'Side panel', shelf: 'Shelf', back: 'Back panel', screw: 'Screw, 1¼ in', driver: 'Screwdriver' },
+  INVENTORY: [
+    ['In the box', [['side', '2'], ['shelf', '3'], ['back', '1'], ['screw', '4']]],
+    ['From the house', [['driver', '1']]]
+  ],
+  /* step keys: title, cam, text, acts [[text, [x,y,z] | null, [dx,dy]]], meta, time, tip, parts [[partKey, qty]],
+     dims [{a, b, off, label}], notes [{p, text}], detail {p, r, hide:[objKeys], view:[x,y,z]}, inventory, calendar [[date, text]],
+     view [x,y,z], walls {h, sides}, cut [objKeys], onEnter(t) -> optional new end time (ms) */
+  STEPS: [
+    {title: 'What this builds', cam: 'overview', inventory: true, time: '≈30 min',
+     text: 'A three-shelf unit against the wall. Every part is below, in the order the steps use it.',
+     tip: 'Lay the parts out on the carton so nothing scratches.'},
+    {title: 'Sides and bottom shelf', cam: 'base', parts: [['side', '2'], ['shelf', '1']], time: '≈10 min',
+     text: 'Stand the sides up and seat the bottom shelf between them.',
+     acts: [['Stand both sides on their back edges, holes facing in.', [-1.47, 1.8, 0.5], [-26, 0]], ['Drop the bottom shelf onto its pins, 3 in off the floor.', [0.7, 0.3, 0.45], [24, 26]]],
+     meta: 'Pins at 3 in', tip: 'The sides are mirror images: the pin holes face each other.',
+     dims: [{a: [-1.5, 0, 0.5], b: [1.5, 0, 0.5], off: [0, 0, 0.5], label: '3 ft'}, {a: [1.5, 0, 0.5], b: [1.5, 4, 0.5], off: [0.5, 0, 0], label: '4 ft'}]},
+    {title: 'Middle and top shelves', cam: 'overview', parts: [['shelf', '2']], time: '≈5 min',
+     text: 'The middle shelf sits on pins; the top one caps the sides.',
+     acts: [['Middle shelf onto the pins at 2 ft.', [0, 2.05, 0.45], [0, 30]], ['Top shelf flush with the tops of the sides.', [0, 3.99, 0.45], [0, -30]]],
+     meta: 'Middle at 2 ft · top flush', detail: {p: [1.44, 2.0, 0.4], r: 0.35}},
+    {title: 'Back panel', cam: 'back', parts: [['back', '1']], time: '≈5 min',
+     text: 'From behind: the panel squares the unit.',
+     acts: [['Slide the panel into the rear grooves from the top.', [0, 3.6, -0.52], [0, -30]], ['Check the diagonals match, then push the unit to the wall.', null]],
+     meta: 'Diagonals equal = square', tip: 'The wall behind is drawn cut down so you can see the back.'},
+    {title: 'Screw the corners', cam: 'joint', parts: [['screw', '4'], ['driver', '1']], cut: ['sideR'], time: '≈10 min',
+     text: 'Four screws through the sides into the bottom and top shelves.',
+     acts: [['A screw through each side into the bottom shelf.', [1.5, 0.25, 0], [30, 10]], ['Two more into the top shelf, hand-tight.', null]],
+     meta: '4 screws · hand-tight', tip: 'The near side is drawn faint so you can see the screw bite the shelf end.',
+     detail: {p: [1.5, 0.25, 0], r: 0.22, hide: ['sideR'], view: [1, 0.35, 0.45]},   /* bubble hides the side so the screw reads in the shelf end */
+     onEnter: function(t){ /* the screws drive home: two turns after they land */
+       var s = t.objs.screwsR.children.concat(t.objs.screwsL.children); t.tween(700, function(e){ s.forEach(function(ch){ ch.rotation.x = e * Math.PI * 4; }); }, t.ease, t.lastLand + 200); return t.lastLand + 900; }},
+    {title: 'Done', cam: 'overview', text: 'Load the heavy books on the bottom shelf.',
+     calendar: [['In a week', 'Re-tighten the four screws']]}
+  ]
+};
+
+(function(){
+var T = THREE;
+var $ = function(s){ return document.querySelector(s); };
+var canvas = $('#c'), stage = $('.stage');
+var hm = /^#step(\d+)(&still)?$/.exec(location.hash || '');
+var STILL = !!(hm && hm[2]);                       /* capture mode: no tweens, no idle drift */
+var reduce = STILL || matchMedia('(prefers-reduced-motion: reduce)').matches;
+var INK = 0x141414, ACCENT = CONFIG.accent, FILL = CONFIG.fill, GREY = 0xececec, WHITE = 0xffffff;
+var VIEW = new T.Vector3().fromArray(CONFIG.view).normalize();
+var CAM = CONFIG.CAM, NAMES = CONFIG.NAMES, INVENTORY = CONFIG.INVENTORY, STEPS = CONFIG.STEPS;
+document.title = CONFIG.title.charAt(0).toUpperCase() + CONFIG.title.slice(1); $('#h1').textContent = CONFIG.title; $('#sub').textContent = CONFIG.subtitle || '';
+document.documentElement.style.setProperty('--accent', '#' + ('00000' + ACCENT.toString(16)).slice(-6));
+
+/* ---------- renderer, lights, cel shading ---------- */
+var renderer = new T.WebGLRenderer({canvas: canvas, antialias: true, alpha: false, preserveDrawingBuffer: true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setClearColor(0xffffff, 1);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false;
+var scene = new T.Scene();
+var world = new T.Group(); scene.add(world);
+scene.add(new T.HemisphereLight(0xffffff, 0xffffff, 0.9));
+var sun = new T.DirectionalLight(0xffffff, 0.16); sun.castShadow = true;
+sun.shadow.mapSize.set(STILL ? 1024 : 2048, STILL ? 1024 : 2048); sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.03;
+scene.add(sun); scene.add(sun.target);
+var camera = new T.OrthographicCamera(-1, 1, 1, -1, 0.1, 500);
+var planCam = new T.OrthographicCamera(-1, 1, 1, -1, 1, 400); planCam.up.set(0, 0, -1); planCam.layers.enable(1);
+var detailCam = new T.OrthographicCamera(-1, 1, 1, -1, 0.1, 500);
+var gm = new T.DataTexture(new Uint8Array([226, 226, 226, 241, 241, 241, 255, 255, 255]), 3, 1, T.RGBFormat); gm.minFilter = T.NearestFilter; gm.magFilter = T.NearestFilter; gm.needsUpdate = true;
+
+/* ---------- helpers (units: feet) ---------- */
+function v(a){ return new T.Vector3(a[0], a[1], a[2]); }
+function mat(color, opacity){ var o = opacity == null ? 1 : opacity; return new T.MeshToonMaterial({color: color, gradientMap: gm, transparent: o < 1, opacity: o}); }
+function edgesOf(geo, opacity){ return new T.LineSegments(new T.EdgesGeometry(geo, 24), new T.LineBasicMaterial({color: INK, transparent: true, opacity: opacity == null ? 0.72 : opacity})); }
+function mesh(geo, color, o){ o = o || {}; var m = new T.Mesh(geo, mat(color, o.opacity)); m.castShadow = !o.noShadow; m.receiveShadow = true; if (o.edge !== false) m.add(edgesOf(geo, o.edge)); return m; }
+function box(w, h, d, color, o){ return mesh(new T.BoxGeometry(w, h, d), color, o); }
+function cyl(rt, rb, h, color, seg, o){ o = o || {}; if (o.edge == null) o.edge = false; return mesh(new T.CylinderGeometry(rt, rb, h, seg || 14), color, o); }
+function sphere(r, color, o){ o = o || {}; if (o.edge == null) o.edge = false; return mesh(new T.SphereGeometry(r, 12, 9), color, o); }
+function tube(points, r, color, tension){ var c = new T.CatmullRomCurve3(points, false, 'catmullrom', tension == null ? 0.2 : tension); var m = mesh(new T.TubeGeometry(c, Math.max(60, points.length * 24), r, 8, false), color, {edge: false}); m.userData.length = c.getLength(); return m; }
+function lines(pts, color, opacity){ return new T.LineSegments(new T.BufferGeometry().setFromPoints(pts), new T.LineBasicMaterial({color: color == null ? INK : color, transparent: true, opacity: opacity == null ? 0.5 : opacity})); }
+function at(obj, x, y, z){ obj.position.set(x, y, z); return obj; }
+function rot(obj, x, y, z){ obj.rotation.set(x || 0, y || 0, z || 0); return obj; }
+function group(){ var g = new T.Group(); for (var i = 0; i < arguments.length; i++) g.add(arguments[i]); return g; }
+function centre(g){ /* bbox centre into g.position, children shifted back: arrows and ghosts land where the part really is */
+  g.updateMatrixWorld(true); var bb = new T.Box3().setFromObject(g); if (bb.isEmpty()) return g; var c = bb.getCenter(new T.Vector3());
+  var local = g.worldToLocal(c.clone()); g.children.forEach(function(ch){ ch.position.sub(local); }); g.position.add(local.applyQuaternion(g.quaternion).multiply(g.scale)); return g; }
+function arrow(from, to){
+  var dir = new T.Vector3().subVectors(to, from); var len = dir.length(); if (len < 0.01) return new T.Group();
+  var sc = Math.min(1, len / 2.2); var g = new T.Group(); var hl = 0.42 * sc, sl = Math.max(0.05, len - hl);
+  var shaft = new T.Mesh(new T.CylinderGeometry(0.055 * sc, 0.055 * sc, sl, 10), mat(ACCENT)); shaft.position.y = sl / 2;
+  var head = new T.Mesh(new T.ConeGeometry(0.2 * sc, hl, 14), mat(ACCENT)); head.position.y = len - hl / 2;
+  g.add(shaft); g.add(head); g.position.copy(from); g.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), dir.clone().normalize());
+  return g;
+}
+function setOpacity(obj, o){ obj.traverse(function(n){ if (n.material){ if (n.material.userData.base == null) n.material.userData.base = n.material.opacity; var val = n.material.userData.base * o; n.material.opacity = val; n.material.transparent = val < 0.999 || n.material.userData.base < 1; } }); }
+function setColor(obj, hex){ obj.traverse(function(n){ if (n.material && n.material.color && !n.isLineSegments) n.material.color.setHex(hex); }); }
+function paint(obj, hex){ obj.traverse(function(n){ if (n.isMesh && n.material.color && !n.material.map) n.material.color.setHex(hex); }); }
+function ghostOf(o){ /* a faint outline of the part where it will land */
+  var g = o.clone(true); g.traverse(function(n){ if (n.isMesh){ n.material = new T.MeshBasicMaterial({color: INK, transparent: true, opacity: 0.16, depthWrite: false}); n.castShadow = false; n.receiveShadow = false; } else if (n.isLineSegments){ n.material = n.material.clone(); n.material.transparent = true; n.material.opacity = 0.6; } });
+  g.position.copy(o.userData.dest); g.visible = true; return g; }
+
+/* walls: a room's walls go in this group via wall(); a step's walls {h, sides} tweens those sides down to h ft (section cut) */
+var walls = new T.Group(); world.add(walls); var WALLS = [];
+function wall(side, x0, x1, y0, y1, z0, z1){ var h = y1 - y0; var geo = new T.BoxGeometry(x1 - x0, h, z1 - z0); geo.translate(0, h / 2, 0); var m = mesh(geo, WHITE, {edge: 0.5}); m.position.set((x0 + x1) / 2, y0, (z0 + z1) / 2); m.userData.wall = {side: side, y0: y0, y1: y1}; walls.add(m); WALLS.push(m); return m; }
+
+/* registry of step objects: reg(key, obj, {add, remove, only:[pages], from, lag, each, span, part, grow, noGhost, noArrow}) */
+var objs = {}; var order = [];
+function reg(key, obj, o){ o = o || {}; if (!obj.isMesh && obj.children.length) centre(obj); var u = obj.userData; u.dest = obj.position.clone(); u.from = o.from || new T.Vector3(0, 2.6, 0);
+  u.add = o.add == null ? 0 : o.add; u.remove = o.remove; u.only = o.only; u.lag = o.lag || 0; u.each = !!o.each; u.span = o.span || 0.9; u.noArrow = !!o.noArrow; u.part = o.part; u.grow = !!o.grow; u.noGhost = !!o.noGhost;
+  world.add(obj); objs[key] = obj; order.push(key); return obj; }
+var P = {};   /* part builders, used in the scene and for the thumbnails; keys match NAMES */
+
+/* ======================================================================
+   PROJECT SCENE: context geometry (painted white), walls, P builders, reg() calls.
+   ====================================================================== */
+var BOARD = 0.06, W = 3, H = 4, D = 1;       /* ¾ in boards; 3 × 4 × 1 ft unit */
+var site = new T.Group(); world.add(site);
+site.add(at(box(9, 0.2, 6, WHITE, {edge: 0.35, noShadow: true}), 0, -0.1, 1.2));   /* floor */
+(function(){ var pts = []; for (var x = -4; x <= 4; x += 1) pts.push(new T.Vector3(x, 0.005, -1.8), new T.Vector3(x, 0.005, 4.2)); for (var z = -1; z <= 4; z += 1) pts.push(new T.Vector3(-4.5, 0.005, z), new T.Vector3(4.5, 0.005, z)); site.add(lines(pts, INK, 0.07)); })();
+wall('N', -4.5, 4.5, 0, 8, -0.8, -0.65);
+wall('W', -4.65, -4.5, 0, 8, -0.8, 4.2);
+
+P.side = function(){ return box(BOARD, H, D, WHITE); };
+P.shelf = function(){ return box(W - 2 * BOARD, BOARD, D - 0.06, WHITE); };
+P.back = function(){ return box(W, H, 0.02, WHITE); };
+P.screw = function(){ return group(rot(cyl(0.018, 0.018, 0.14, WHITE, 8), 0, 0, Math.PI / 2), at(rot(cyl(0.045, 0.045, 0.018, WHITE, 12), 0, 0, Math.PI / 2), 0.078, 0, 0)); };
+/* THUMB_ONLY[key]: optional thumbnail-only builder for parts too thin to read in the callout (bands, wires) */
+var THUMB_ONLY = { screw: function(){ return group(rot(cyl(0.035, 0.035, 0.14, WHITE, 8), 0, 0, Math.PI / 2), at(rot(cyl(0.06, 0.06, 0.03, WHITE, 12), 0, 0, Math.PI / 2), 0.085, 0, 0)); } };
+P.driver = function(){ return group(at(cyl(0.05, 0.05, 0.35, WHITE, 12, {edge: 0.5}), 0, 0.17, 0), at(cyl(0.012, 0.012, 0.35, WHITE, 8), 0, -0.17, 0)); };
+
+reg('sideL', at(P.side(), -W / 2 + BOARD / 2, H / 2, 0), {add: 1, from: new T.Vector3(-1.4, 0.6, 0), part: 'side'});
+reg('sideR', at(P.side(), W / 2 - BOARD / 2, H / 2, 0), {add: 1, lag: 0.15, from: new T.Vector3(1.4, 0.6, 0), part: 'side'});
+reg('shelf0', at(P.shelf(), 0, 0.25, 0.03), {add: 1, lag: 0.5, from: new T.Vector3(0, 1.4, 0), part: 'shelf'});
+reg('shelf1', at(P.shelf(), 0, 2.0, 0.03), {add: 2, from: new T.Vector3(0, 1.4, 0), part: 'shelf'});
+reg('shelf2', at(P.shelf(), 0, H - BOARD / 2, 0.03), {add: 2, lag: 0.3, from: new T.Vector3(0, 1.2, 0), part: 'shelf'});
+reg('back', at(P.back(), 0, H / 2, -D / 2 - 0.01), {add: 3, from: new T.Vector3(0, 2.4, 0), part: 'back'});
+reg('screwsR', group(at(P.screw(), 1.47, 0.25, 0), at(P.screw(), 1.47, H - BOARD / 2, 0)), {add: 4, each: true, span: 0.4, from: new T.Vector3(0.5, 0, 0), part: 'screw', noArrow: true});
+reg('screwsL', group(at(rot(P.screw(), 0, Math.PI, 0), -1.47, 0.25, 0), at(rot(P.screw(), 0, Math.PI, 0), -1.47, H - BOARD / 2, 0)), {add: 4, each: true, span: 0.4, lag: 0.3, from: new T.Vector3(-0.5, 0, 0), part: 'screw', noArrow: true});
+reg('driver', at(rot(P.driver(), 0, 0, Math.PI / 2), 1.75, 0.25, 0.25), {add: 4, only: [4], from: new T.Vector3(0.8, 0.4, 0), lag: 0.9, part: 'driver'});
+(function(){ var g = new T.Group(); var x = -1.3; [0.55, 0.62, 0.5, 0.7, 0.58, 0.66, 0.52, 0.6].forEach(function(h, i){ var w = 0.12 + (i % 3) * 0.03; g.add(at(box(w, h, 0.7, WHITE), x + w / 2, 0.28 + h / 2, 0.05)); x += w + 0.01; });
+  reg('books', g, {only: [5], grow: true, each: true, span: 0.9, noArrow: true, noGhost: true}); })();
+/* ===================== end of PROJECT SCENE ===================== */
+
+var LAST = STEPS.length - 1;
+
+/* The scale figure BIG's axons always carry: an adult drawn to Le Corbusier's Modulor (crown 183 cm, navel 113, hanging wrist 86,
+   raised fingertips 226), one smooth front-view outline cut flat like a model's card figure, in one grey with no edges, darker than
+   the model's shade and lighter than its ink. Never build people from cylinders, boxes or spheres: they read as mannequins, not
+   people. The outline is in cm, x toward the hanging arm. */
+function modulorFigure(){
+  var NECK = [[5.4, 163], [5.6, 158.5], [6.2, 155.6], [8.4, 153.6], [13, 151.7], [19.6, 149.7], [20.6, 146], [19.2, 141], [17.4, 136]];
+  var SIDE = [[16.5, 130], [15.4, 122], [14.6, 113], [15.3, 105], [17, 98]];
+  var LEG = [[17.9, 90], [17.5, 80], [16.2, 69], [15, 60], [14.3, 54], [14.1, 49], [14.8, 41], [14.4, 33], [13.2, 24], [12.2, 16], [12.4, 11.5], [12.8, 8], [14.2, 5], [14.8, 2.4], [14.6, 0]];
+  var INSEAM = [[4, 0], [3.9, 2.4], [4.6, 5], [5.8, 8], [5.6, 12], [4.8, 21], [3.6, 30], [3.1, 37], [3.4, 44], [3.1, 50], [2.4, 57], [1.3, 67], [0.4, 77], [0, 84]];
+  var RAISED = [[-18, 137], [-20.4, 144], [-21.9, 150.5], [-22, 157], [-21.4, 165], [-20.4, 173], [-19.6, 181], [-19.1, 188], [-18.3, 196], [-17.2, 203], [-16.8, 207.5], [-17.3, 212], [-17.4, 218], [-16.6, 223], [-14.8, 225.6], [-12.8, 226], [-10.8, 225.6], [-9.1, 223], [-8.6, 218], [-8.8, 212], [-10.4, 207.5], [-11.2, 200], [-11.4, 191], [-11.6, 182], [-11.8, 174], [-12.2, 166], [-12.6, 158], [-12, 153.6], [-9.2, 153.6], [-6.2, 155.6], [-5.6, 158.5], [-5.4, 163]];
+  var HANGING = [[16.4, 146], [17.2, 139], [17.9, 132], [18.7, 125], [19.3, 118], [19.5, 111], [20.1, 102], [20.9, 93], [21.3, 86], [21.1, 80], [21.5, 74.5], [22.5, 70], [24, 68.4], [25.6, 69.6], [26.4, 74], [26.8, 80], [26.6, 86], [27.4, 95], [27.9, 104], [27.4, 112], [26.6, 118], [26.2, 124], [26.4, 131], [26.8, 137], [26.6, 142], [25.4, 146.5], [23.2, 149.2], [20.4, 150.2], [17.5, 149.5]];
+  var HEAD = [[0, 158.9], [2.6, 159.3], [4.6, 160.8], [6.2, 163.4], [7.3, 166.5], [7.8, 171], [7.5, 175], [6.6, 178.6], [4.8, 181.3], [2.5, 182.7], [0, 183]];
+  var mirror = function(run){ return run.map(function(p){ return [-p[0], p[1]]; }).reverse(); };
+  var ft = function(p){ return new T.Vector2(p[0] / 30.48, p[1] / 30.48); };
+  var outline = function(runs){ var s = new T.Shape(); s.moveTo(runs[0][0][0] / 30.48, runs[0][0][1] / 30.48);
+    runs.forEach(function(r, i){ if (i && s.currentPoint.distanceTo(ft(r[0])) > 1e-6) s.lineTo(r[0][0] / 30.48, r[0][1] / 30.48); s.splineThru(r.slice(1).map(ft)); });
+    return s; };
+  var shapes = [outline([NECK.concat(SIDE, LEG), INSEAM, mirror(INSEAM), mirror(LEG).concat(mirror(SIDE), RAISED)]), outline([HANGING]),
+    outline([HEAD.concat(mirror(HEAD).slice(1))])];
+  var m = new T.Mesh(new T.ShapeGeometry(shapes), new T.MeshBasicMaterial({color: 0x555555, side: T.DoubleSide}));
+  m.castShadow = true; m.userData.keepColor = true; return m;
+}
+/* the white model: everything that is not a registered part goes white, except the scale figure */
+if (CONFIG.figure){ (function(){ var fig = modulorFigure(); fig.rotation.y = CONFIG.figure[2] != null ? CONFIG.figure[2] : Math.atan2(VIEW.x, VIEW.z);
+  at(fig, CONFIG.figure[0], 0, CONFIG.figure[1]); world.add(fig); })(); }
+world.children.forEach(function(ch){ if (order.some(function(k){ return objs[k] === ch; })) return; if (!ch.userData.keepColor) paint(ch, WHITE); });
+
+/* bounds: shadow camera and plan inset fit the scene */
+(function(){ world.updateMatrixWorld(true); var bb = new T.Box3().setFromObject(world); var c = bb.getCenter(new T.Vector3()), s = bb.getSize(new T.Vector3()); var R = Math.max(s.x, s.y, s.z) * 0.75 + 1;
+  sun.position.set(c.x - 0.5 * R, c.y + R, c.z + 0.45 * R); sun.target.position.copy(c); var sc = sun.shadow.camera; sc.left = -R; sc.right = R; sc.top = R; sc.bottom = -R; sc.near = 0.1; sc.far = R * 4; sc.updateProjectionMatrix();
+  var pl = CONFIG.plan || {c: [c.x, c.z], r: Math.max(s.x, s.z) / 2 * 1.08}; planCam.left = -pl.r; planCam.right = pl.r; planCam.top = pl.r; planCam.bottom = -pl.r; planCam.far = bb.max.y + 200;
+  planCam.position.set(pl.c[0], bb.max.y + 50, pl.c[1]); planCam.lookAt(pl.c[0], 0, pl.c[1]); planCam.updateProjectionMatrix(); })();
+
+var THUMB = {};
+(function(){ var tc = document.createElement('canvas'); var tr = new T.WebGLRenderer({canvas: tc, antialias: true, alpha: true, preserveDrawingBuffer: true}); tr.setPixelRatio(2); tr.setSize(72, 72, false); tr.setClearColor(0xffffff, 0);
+  var sc = new T.Scene(); sc.add(new T.HemisphereLight(0xffffff, 0xffffff, 0.9)); var dl = new T.DirectionalLight(0xffffff, 0.16); dl.position.set(-6, 10, 6); sc.add(dl);
+  var cam = new T.OrthographicCamera(-1, 1, 1, -1, 0.01, 100); var tv = new T.Vector3().fromArray(CONFIG.view).normalize();
+  Object.keys(P).forEach(function(k){ var o = ((typeof THUMB_ONLY !== 'undefined' && THUMB_ONLY[k]) || P[k])(); paint(o, FILL); sc.add(o); o.updateMatrixWorld(true); var bb = new T.Box3().setFromObject(o); var c = bb.getCenter(new T.Vector3()); var r = bb.getSize(new T.Vector3()).length() / 2 * 1.02 + 0.02;
+    cam.position.copy(c).addScaledVector(tv, 20); cam.lookAt(c); cam.left = -r; cam.right = r; cam.top = r; cam.bottom = -r; cam.updateProjectionMatrix(); tr.render(sc, cam); THUMB[k] = tc.toDataURL('image/png'); sc.remove(o); });
+  tr.dispose(); if (tr.forceContextLoss) tr.forceContextLoss(); })();
+function partItem(key, qty, cls){ var li = document.createElement('li'); var q = /^\d+$/.test(qty) ? '×' + qty : qty;
+  if (cls === 'callout'){ li.innerHTML = '<div class="th"><img alt=""><span class="q"></span></div><span class="nm"></span>'; li.addEventListener('click', function(){ pulse(key); }); }
+  else { li.innerHTML = '<img alt=""><span class="q"></span><span class="nm"></span>'; }
+  li.querySelector('img').src = THUMB[key] || ''; li.querySelector('.q').textContent = q; li.querySelector('.nm').textContent = NAMES[key] || key; return li; }
+
+/* ---------- state and animation ---------- */
+var tweens = [];
+function ease(t){ return 1 - Math.pow(1 - t, 3); }
+function easeIO(t){ return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+/* a tween's clock starts on its first rendered frame, so a slow first frame can't eat the opening motion */
+function tween(dur, fn, easing, delay){ var tw = {t0: null, d: reduce ? 0 : (delay || 0), dur: reduce ? 0 : dur, fn: fn, e: easing || ease}; tweens.push(tw); return tw; }
+function stepTweens(now){ for (var i = tweens.length - 1; i >= 0; i--){ var tw = tweens[i]; if (tw.t0 == null) tw.t0 = now + tw.d; if (now < tw.t0) continue; var k = tw.dur === 0 ? 1 : Math.min(1, (now - tw.t0) / tw.dur); tw.fn(tw.e(k), k); if (k >= 1) tweens.splice(i, 1); } }
+var temps = [];
+function clearTemps(){ temps.forEach(function(a){ world.remove(a); }); temps = []; }
+function accel(i, n, span){ return n <= 1 ? 0 : span * Math.sqrt(i / (n - 1)); }
+
+function visibleAt(obj, k, page){ var u = obj.userData; if (u.only) return u.only.indexOf(page) >= 0; return u.add <= k && (u.remove == null || k < u.remove); }
+function applyState(k, page){
+  order.forEach(function(key){ var o = objs[key]; var u = o.userData; o.visible = visibleAt(o, k, page); o.position.copy(u.dest); o.scale.setScalar(1); setOpacity(o, 1);
+    o.traverse(function(n){ if (n.isLineSegments && n.material.userData.inkBase) n.material.color.setHex(INK); });
+    if (u.each) o.children.forEach(function(ch){ if (ch.userData.dest) ch.position.copy(ch.userData.dest); ch.scale.setScalar(1); });
+    var hot = page === 0 || (u.only ? u.only.indexOf(page) >= 0 : (u.add === page || u.remove === page)); paint(o, hot ? FILL : GREY); });
+}
+function landing(o, from, dest, lag, dur){ o.visible = true; o.position.copy(from); setOpacity(o, 0); tween(180, function(e){ setOpacity(o, e); }, null, lag - 180); tween(dur || 700, function(e){ o.position.lerpVectors(from, dest, e); }, ease, lag); }
+function pulse(partKey){ /* tap a part in the callout: it blinks twice and its outline flashes the accent */
+  order.forEach(function(key){ var o = objs[key]; if (o.userData.part !== partKey || !o.visible) return; var b = o.userData.cutK || 1;
+    var inks = []; o.traverse(function(n){ if (n.isLineSegments && n.material.color && inks.indexOf(n.material) < 0){ n.material.userData.inkBase = true; inks.push(n.material); } });
+    tween(900, function(e, k){ setOpacity(o, b * (1 - 0.75 * Math.abs(Math.sin(k * Math.PI * 2)))); inks.forEach(function(m){ m.color.setHex(k < 1 ? ACCENT : INK); }); }, function(t){ return t; }); });
+}
+
+/* per-step view: the step's own keys override its CAM preset */
+function specOf(i){ var s = STEPS[i], p = CAM[s.cam] || {}; return {c: p.c, r: p.r, v: s.view || p.v || CONFIG.view, walls: s.walls !== undefined ? s.walls : p.walls, cut: s.cut || p.cut || []}; }
+var camT = {c: new T.Vector3(), r: 10};
+var scaleBar = $('#scaleBar'), scaleTxt = $('#scaleTxt');
+function frame(c, r){ camT.c.copy(c); camT.r = r; camera.position.copy(c).addScaledVector(VIEW, 120); camera.lookAt(c); var w = stage.clientWidth || 1, h = stage.clientHeight || 1, a = w / h;
+  if (a >= 1){ camera.top = r; camera.bottom = -r; camera.left = -r * a; camera.right = r * a; } else { camera.left = -r; camera.right = r; camera.top = r / a; camera.bottom = -r / a; } camera.updateProjectionMatrix();
+  var pxPerFt = a >= 1 ? h / (2 * r) : w / (2 * r); var opts = [[10, '10 ft'], [5, '5 ft'], [2, '2 ft'], [1, '1 ft'], [0.5, '6 in'], [1 / 12, '1 in']]; var pick = opts[opts.length - 1];
+  for (var i = 0; i < opts.length; i++){ if (opts[i][0] * pxPerFt <= 110){ pick = opts[i]; break; } } scaleBar.style.width = (pick[0] * pxPerFt).toFixed(1) + 'px'; scaleTxt.textContent = pick[1]; }
+function setWalls(spec){ WALLS.forEach(function(m){ var w = m.userData.wall; var t = 1;
+    if (spec && spec.h != null && (!spec.sides || spec.sides.indexOf(w.side) >= 0)) t = w.y0 >= spec.h ? 0 : (Math.min(w.y1, spec.h) - w.y0) / (w.y1 - w.y0);
+    var s0 = m.scale.y; if (Math.abs(t - s0) < 1e-3) return; m.visible = true; tween(900, function(e){ var s = s0 + (t - s0) * e; m.scale.y = Math.max(0.001, s); m.visible = s > 0.002; }, easeIO); }); }
+function moveCam(sp){ var c0 = camT.c.clone(), r0 = camT.r, c1 = v(sp.c), r1 = sp.r, v0 = VIEW.clone(), v1 = v(sp.v).normalize(); setWalls(sp.walls);
+  if (c0.distanceTo(c1) < 0.01 && Math.abs(r0 - r1) < 0.01 && v0.distanceTo(v1) < 0.001) return; tween(900, function(e){ VIEW.copy(v0).lerp(v1, e).normalize(); frame(c0.clone().lerp(c1, e), r0 + (r1 - r0) * e); }, easeIO); }
+var CUT_O = 0.12, cutNow = [];
+function setCut(keys){ order.forEach(function(key){ var o = objs[key]; var was = cutNow.indexOf(key) >= 0, is = keys.indexOf(key) >= 0; if (!was && !is) return; var a = was ? CUT_O : 1, b = is ? CUT_O : 1;
+    o.userData.cutK = b; setOpacity(o, a); tween(600, function(e){ setOpacity(o, a + (b - a) * e); o.traverse(function(n){ if (n.isMesh) n.material.depthWrite = !is || e < 0.5; }); }, easeIO); if (!is) o.userData.cutK = 1; }); cutNow = keys.slice(); }
+
+var planFrame = new T.LineLoop(new T.BufferGeometry().setFromPoints([new T.Vector3(-1, 0, -1), new T.Vector3(1, 0, -1), new T.Vector3(1, 0, 1), new T.Vector3(-1, 0, 1)]), new T.LineBasicMaterial({color: ACCENT})); planFrame.layers.set(1); scene.add(planFrame);
+var planEl = $('.plan');
+
+var bubble = $('#bubble'), bubbleIn = bubble.firstElementChild, leader = $('#leader'), ring = $('#ring');
+var detail = null, bubbleK = 0;
+function setDetail(spec, delay){ detail = null; bubble.classList.remove('on'); bubbleK = 0; if (!spec) return;
+  tween(1, function(){ detail = {p: v(spec.p), r: spec.r, hide: spec.hide || [], v: (spec.view || spec.v) ? v(spec.view || spec.v).normalize() : null}; bubble.classList.add('on'); }, null, delay);
+  tween(420, function(e){ bubbleK = e; bubbleIn.style.transform = 'scale(' + e.toFixed(3) + ')'; }, ease, delay); }
+
+var dimLayer = $('#dims'); var dimObjs = []; var labels = [];
+function clearDims(){ dimObjs.forEach(function(o){ world.remove(o); }); dimObjs = []; labels = []; dimLayer.innerHTML = ''; }
+function showLater(el, delay){ if (reduce) el.classList.add('on'); else setTimeout(function(){ el.classList.add('on'); }, delay); }
+function addDim(d, delay){ var A = v(d.a), B = v(d.b), O = v(d.off); var A2 = A.clone().add(O), B2 = B.clone().add(O); var ext = O.clone().normalize().multiplyScalar(0.18); var dir = B2.clone().sub(A2).normalize(); var tick = new T.Vector3().crossVectors(dir, O.clone().normalize()); if (tick.length() < 0.01) tick.set(0, 1, 0); tick.normalize().multiplyScalar(0.12);
+  var pts = [A.clone().add(O.clone().normalize().multiplyScalar(0.12)), A2.clone().add(ext), B.clone().add(O.clone().normalize().multiplyScalar(0.12)), B2.clone().add(ext), A2, B2, A2.clone().sub(tick), A2.clone().add(tick), B2.clone().sub(tick), B2.clone().add(tick)];
+  var l = lines(pts, INK, 0.8); l.material.opacity = 0; world.add(l); dimObjs.push(l); tween(300, function(e){ l.material.opacity = 0.8 * e; }, null, delay);
+  var el = document.createElement('div'); el.className = 'dim'; el.textContent = d.label; dimLayer.appendChild(el); labels.push({el: el, p: A2.clone().lerp(B2, 0.5), dy: -14}); showLater(el, delay); }
+function addNote(nt, delay){ var p = v(nt.p); var dot = new T.Mesh(new T.SphereGeometry(0.05, 8, 6), new T.MeshBasicMaterial({color: INK, transparent: true, opacity: 0})); dot.position.copy(p); world.add(dot); dimObjs.push(dot); tween(300, function(e){ dot.material.opacity = e; }, null, delay);
+  var el = document.createElement('div'); el.className = 'note'; el.textContent = nt.text; dimLayer.appendChild(el); labels.push({el: el, p: p, dy: -18}); showLater(el, delay); }
+function addMark(n, p, off, delay){ var el = document.createElement('div'); el.className = 'mark'; el.textContent = n; off = off || [0, 0];
+  var ln = document.createElement('i'); el.appendChild(ln);   /* leader: sized each frame from the clamped mark position */
+  dimLayer.appendChild(el); labels.push({el: el, p: v(p), dx: off[0], dy: off[1], ln: ln}); showLater(el, delay); }
+var tmpV = new T.Vector3();
+function project(p, w, h){ tmpV.copy(p).applyMatrix4(world.matrixWorld).project(camera); return [(tmpV.x + 1) / 2 * w, (1 - tmpV.y) / 2 * h]; }
+var calloutEl = $('#callout'), partsEl = $('#parts');
+function partsCue(){ calloutEl.classList.toggle('more', partsEl.scrollWidth - partsEl.clientWidth - partsEl.scrollLeft > 2); }
+partsEl.addEventListener('scroll', partsCue, {passive: true});
+function placeLabels(w, h){ var top = calloutEl.hidden ? 4 : calloutEl.offsetTop + calloutEl.offsetHeight + 6; labels.forEach(function(L){ var s = project(L.p, w, h); var x = s[0] + (L.dx || 0), y = s[1] + L.dy; var ew = L.el.offsetWidth, eh = L.el.offsetHeight; x = Math.max(4 + ew / 2, Math.min(w - 4 - ew / 2, x)); y = Math.max(top + eh / 2, Math.min(h - 4 - eh / 2, y)); L.el.style.transform = 'translate(' + (x - ew / 2).toFixed(1) + 'px,' + (y - eh / 2).toFixed(1) + 'px)';
+    if (L.ln){ var ddx = s[0] - x, ddy = s[1] - y, len = Math.hypot(ddx, ddy); L.ln.style.display = len > 16 ? 'block' : 'none'; L.ln.style.width = Math.max(0, len - 14).toFixed(1) + 'px'; L.ln.style.transform = 'rotate(' + Math.atan2(ddy, ddx).toFixed(4) + 'rad) translateX(11px)'; } }); }
+
+var current = -1, rotUser = 0;
+var where = $('#where'), body = $('#body');
+function enter(i, replay){
+  var s = STEPS[i], sp = specOf(i); clearTemps(); clearDims(); tweens = []; setDetail(null);
+  var r0 = rotUser; if (Math.abs(r0) > 0.001) tween(700, function(e){ rotUser = r0 * (1 - e); });
+  var base = (i === 0 || i === LAST) ? LAST : i - 1;
+  applyState(base, i);
+  order.forEach(function(key){ var o = objs[key], u = o.userData; if (u.only && u.only.indexOf(i) < 0 && u.only.indexOf(i - 1) >= 0 && i !== 0){ o.visible = true; setOpacity(o, 1); (function(o2){ tween(260, function(e){ setOpacity(o2, 1 - e); if (e >= 1) o2.visible = false; }); })(o); } });
+  if (cutNow.length){ cutNow.forEach(function(k){ setOpacity(objs[k], CUT_O); }); } setCut(sp.cut);
+  moveCam(sp);
+  var lastLand = 350;
+  if (i > 0 && i < LAST){
+    order.forEach(function(key){ var o = objs[key], u = o.userData;
+      var arrives = u.only ? (u.only.indexOf(i) >= 0 && u.only.indexOf(i - 1) < 0) : u.add === i;
+      if (arrives){
+        var lag = 350 + u.lag * 1000; var from = u.dest.clone().add(u.from);
+        if (!u.noGhost && (!u.each || o.children.length <= 8)){ var gh = ghostOf(o); world.add(gh); temps.push(gh); (function(g2, l2, d2){ tween(d2, function(e){ setOpacity(g2, 1 - e); if (e >= 1) g2.visible = false; }, null, l2); })(gh, lag, u.each ? u.span * 1000 + 400 : 700); }
+        if (!u.noArrow){ var ar = arrow(from.clone().addScaledVector(u.from, -0.1), u.dest.clone().addScaledVector(u.from.clone().normalize(), 0.3)); ar.visible = !reduce; world.add(ar); temps.push(ar); (function(ar2, l2){ tween(300, function(e){ setOpacity(ar2, 1 - e); if (e >= 1) ar2.visible = false; }, null, l2 + 650); })(ar, lag); }
+        if (u.each){ o.visible = true; o.position.copy(u.dest); var n = o.children.length; o.children.forEach(function(ch, j){ if (!ch.userData.dest) ch.userData.dest = ch.position.clone(); landing(ch, ch.userData.dest.clone().add(u.from), ch.userData.dest, lag + accel(j, n, u.span) * 1000, 520); }); lastLand = Math.max(lastLand, lag + u.span * 1000 + 520); }
+        else { landing(o, from, u.dest, lag); lastLand = Math.max(lastLand, lag + 700); }
+      } else if (u.remove === i){
+        o.visible = true; o.position.copy(u.dest); setOpacity(o, 1); var to = u.dest.clone().add(u.from); var lag2 = 350 + u.lag * 1000;
+        var ar3 = arrow(u.dest.clone().addScaledVector(u.from.clone().normalize(), 0.9), to); ar3.visible = !reduce; world.add(ar3); temps.push(ar3);
+        (function(o2, to2, ar4, l3){ tween(700, function(e){ o2.position.lerpVectors(o2.userData.dest, to2, e); setOpacity(o2, 1 - e * 0.9); if (e >= 1) o2.visible = false; }, ease, l3); tween(300, function(e){ setOpacity(ar4, 1 - e); if (e >= 1) ar4.visible = false; }, null, l3 + 650); })(o, to, ar3, lag2);
+        lastLand = Math.max(lastLand, lag2 + 700);
+      }
+    });
+  }
+  if (i === LAST){ /* grow parts rise out of the model, slow first and then all at once */
+    order.forEach(function(key){ var o = objs[key], u = o.userData; if (!u.grow || !o.visible) return; var lag = 500 + u.lag * 1000, n = o.children.length;
+      o.children.forEach(function(ch, j){ ch.scale.setScalar(0.001); (function(c2, d){ tween(600, function(e){ c2.scale.setScalar(0.001 + 0.999 * e); }, ease, d); })(ch, lag + accel(j, n, u.span) * 1000); }); }); }
+  if (s.onEnter){ var r = s.onEnter({i: i, lastLand: lastLand, objs: objs, tween: tween, ease: ease, easeIO: easeIO, setOpacity: setOpacity, setColor: setColor, paint: paint, T: T, still: reduce}); if (typeof r === 'number') lastLand = r; }
+  (s.dims || []).forEach(function(d, j){ addDim(d, lastLand + 250 + j * 150); });
+  (s.notes || []).forEach(function(nt, j){ addNote(nt, lastLand + 250 + j * 150); });
+  (s.acts || []).forEach(function(a, j){ if (a[1]) addMark(j + 1, a[1], a[2], lastLand + 350 + j * 120); });
+  setDetail(s.detail, lastLand + 600);
+  var fill = function(){
+    $('#num').innerHTML = i === 0 ? '<small>Parts</small>' : (i === LAST ? '<small>Done</small>' : String(i));
+    $('#title').textContent = s.title; $('#text').textContent = s.text || ''; $('#meta').textContent = (s.time ? s.time + (s.meta ? ' · ' : '') : '') + (s.meta || ''); $('#tip').textContent = s.tip || '';
+    var acts = $('#acts'); acts.innerHTML = ''; (s.acts || []).forEach(function(a, j){ var li = document.createElement('li'); li.innerHTML = '<b></b><span></span>'; li.children[0].textContent = String(j + 1); li.children[1].textContent = a[0]; acts.appendChild(li); });
+    var extra = $('#extra'); extra.innerHTML = '';
+    if (s.inventory){ INVENTORY.forEach(function(gp){ var h = document.createElement('p'); h.className = 'grp'; h.textContent = gp[0]; extra.appendChild(h); var ul = document.createElement('ul'); ul.className = 'inv'; gp[1].forEach(function(p){ ul.appendChild(partItem(p[0], p[1], 'inv')); }); extra.appendChild(ul); }); }
+    if (s.calendar){ var cl = document.createElement('ul'); cl.className = 'cal'; s.calendar.forEach(function(p){ var li = document.createElement('li'); li.innerHTML = '<span class="d"></span><span></span>'; li.children[0].textContent = p[0]; li.children[1].textContent = p[1]; cl.appendChild(li); }); extra.appendChild(cl); }
+    $('#sheet').scrollTop = 0; body.style.opacity = 1;
+  };
+  if (reduce || current < 0 || replay){ fill(); } else { body.style.opacity = 0; setTimeout(fill, 150); }
+  var co = $('#callout'), pl = $('#parts'); pl.innerHTML = '';
+  if (s.parts && s.parts.length){ s.parts.forEach(function(p){ pl.appendChild(partItem(p[0], p[1], 'callout')); }); co.hidden = false; } else { co.hidden = true; } partsCue();
+  $('#replay').hidden = !(i > 0 && i < LAST);
+  $('#prev').disabled = i === 0; $('#next').textContent = i === LAST ? 'Back to the parts' : (i === 0 ? 'Start' : (i === LAST - 1 ? 'Finish' : 'Next step'));
+  $('#bar').style.width = (i / LAST * 100) + '%';
+  Array.prototype.forEach.call($('#ticks').children, function(b, j){ b.classList.toggle('done', j < i); });
+  where.textContent = (CONFIG.date ? CONFIG.date + ' · ' : '') + (i === 0 ? 'parts' : (i === LAST ? 'done' : i + ' of ' + (LAST - 1)));
+  if (!replay){ try { localStorage.setItem(CONFIG.storageKey, String(i)); } catch (e) {} }
+  current = i;
+}
+(function(){ var t = $('#ticks'); for (var j = 0; j < LAST; j++) t.appendChild(document.createElement('b')); })();
+function go(d){ var n = current + d; if (n < 0) n = 0; if (n > LAST) n = 0; enter(n); }
+$('#prev').addEventListener('click', function(){ go(-1); });
+$('#next').addEventListener('click', function(){ go(1); });
+$('#replay').addEventListener('click', function(){ enter(current, true); });
+document.addEventListener('keydown', function(e){ if (e.key === 'ArrowRight' || e.key === ' '){ e.preventDefault(); go(1); } if (e.key === 'ArrowLeft'){ e.preventDefault(); go(-1); } if (e.key === 'r') enter(current, true); });
+(function(){ var t0 = null; var el = $('#sheet'); el.addEventListener('pointerdown', function(e){ t0 = {x: e.clientX, y: e.clientY, id: e.pointerId}; }, {passive: true});
+  el.addEventListener('pointerup', function(e){ if (!t0 || e.pointerId !== t0.id) return; var dx = e.clientX - t0.x, dy = e.clientY - t0.y; t0 = null; if (Math.abs(dx) > 60 && Math.abs(dy) < 40) go(dx < 0 ? 1 : -1); }, {passive: true});
+  el.addEventListener('pointercancel', function(){ t0 = null; }); })();
+
+var drag = null;
+canvas.addEventListener('pointerdown', function(e){ drag = {x: e.clientX, rot: rotUser}; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointermove', function(e){ if (!drag) return; rotUser = Math.max(-0.9, Math.min(0.9, drag.rot + (e.clientX - drag.x) * 0.006)); });
+canvas.addEventListener('pointerup', function(){ drag = null; }); canvas.addEventListener('pointercancel', function(){ drag = null; });
+
+function wake(){ if (navigator.wakeLock && navigator.wakeLock.request) navigator.wakeLock.request('screen').catch(function(){}); }
+document.addEventListener('pointerdown', wake, {once: true}); document.addEventListener('visibilitychange', function(){ if (!document.hidden) wake(); });
+
+function resize(){ var w = stage.clientWidth, h = stage.clientHeight; var ps = (h < 480 ? 84 : 104) + 'px'; planEl.style.width = ps; planEl.style.height = ps; renderer.setSize(w, h, false); frame(camT.c, camT.r); if (typeof partsCue === 'function') partsCue(); }
+new ResizeObserver(resize).observe(stage);
+var dTarget = new T.Vector3();
+function loop(now){
+  stepTweens(now);
+  world.rotation.y = rotUser + (reduce ? 0 : 0.028 * Math.sin(now / 9000 * Math.PI * 2));
+  world.updateMatrixWorld();
+  planFrame.position.set(camT.c.x, planCam.position.y - 10, camT.c.z); planFrame.scale.set(camT.r * 0.8, 1, camT.r * 0.8);
+  var w = stage.clientWidth, h = stage.clientHeight;
+  renderer.shadowMap.needsUpdate = true;
+  renderer.setViewport(0, 0, w, h); renderer.setScissorTest(false); renderer.setClearColor(0xffffff, 1); renderer.render(scene, camera);
+  var PLAN_PX = planEl.clientWidth || 84; var px = w - PLAN_PX - 12, py = h - 52 - PLAN_PX;
+  renderer.setScissorTest(true); renderer.setViewport(px, py, PLAN_PX, PLAN_PX); renderer.setScissor(px, py, PLAN_PX, PLAN_PX); renderer.setClearColor(0xf7f6f2, 1); renderer.clear(); renderer.render(scene, planCam);
+  if (detail && bubbleK > 0.02){
+    var D = bubble.clientWidth, dsz = Math.max(2, D * bubbleK); var cx = w - 12 - D / 2, cyy = 12 + D / 2; var bx = cx - dsz / 2, by = cyy - dsz / 2;
+    dTarget.copy(detail.p).applyMatrix4(world.matrixWorld); detailCam.position.copy(dTarget).addScaledVector(detail.v || VIEW, 60); detailCam.lookAt(dTarget); var r = detail.r; detailCam.left = -r; detailCam.right = r; detailCam.top = r; detailCam.bottom = -r; detailCam.updateProjectionMatrix();
+    renderer.setViewport(bx, by, dsz, dsz); renderer.setScissor(bx, by, dsz, dsz); renderer.setClearColor(0xffffff, 1); renderer.clear(); var hid = detail.hide.filter(function(k){ return objs[k] && objs[k].visible; }); hid.forEach(function(k){ objs[k].visible = false; }); renderer.render(scene, detailCam); hid.forEach(function(k){ objs[k].visible = true; });
+    var s2 = project(detail.p, w, h); var ax = s2[0], ay = s2[1]; var bcx = cx, bcy = h - cyy; var ang = Math.atan2(ay - bcy, ax - bcx); var L = Math.hypot(ax - bcx, ay - bcy); var start = dsz / 2 + 1;
+    leader.style.transform = 'translate(' + (bcx + Math.cos(ang) * start).toFixed(1) + 'px,' + (bcy + Math.sin(ang) * start).toFixed(1) + 'px) rotate(' + ang.toFixed(4) + 'rad)'; leader.style.width = Math.max(0, L - start - 9).toFixed(1) + 'px'; leader.style.opacity = bubbleK;
+    ring.style.transform = 'translate(' + (ax - 9).toFixed(1) + 'px,' + (ay - 9).toFixed(1) + 'px)'; ring.style.opacity = bubbleK;
+  }
+  renderer.setScissorTest(false);
+  placeLabels(w, h);
+  requestAnimationFrame(loop);
+}
+
+var start = 0; try { start = Math.min(LAST, Math.max(0, parseInt(localStorage.getItem(CONFIG.storageKey) || '0', 10) || 0)); } catch (e) {}
+if (hm) start = Math.min(LAST, Math.max(0, parseInt(hm[1], 10)));
+var sp0 = specOf(start); VIEW.copy(v(sp0.v)).normalize(); resize(); frame(v(sp0.c), sp0.r); enter(start);
+requestAnimationFrame(loop);
+})();
+</script>

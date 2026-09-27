@@ -1,0 +1,17 @@
+{
+  "name": "skylarkitchen",
+  "owner": {
+    "name": "Skylar Kitchen",
+    "url": "https://github.com/SkylarKitchen"
+  },
+  "description": "Skylar Kitchen's agent skills, as an installable Claude Code plugin.",
+  "plugins": [
+    {
+      "name": "skylarkitchen-skills",
+      "source": "./",
+      "description": "Agent skills for design work: 3D build guides and more.",
+      "category": "design",
+      "keywords": ["design", "skills", "three.js", "3d", "manual"]
+    }
+  ]
+}

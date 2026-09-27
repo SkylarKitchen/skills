@@ -1,0 +1,3 @@
+interface:
+  display_name: "3D assembly manual"
+  short_description: "Build a phone-first 3D step-by-step build guide"
