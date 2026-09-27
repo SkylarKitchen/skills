@@ -656,6 +656,9 @@ function loadPhotos(){ if (!TEXDIR || (HASH.debug && HASH.drawn)) return photoSt
   function done(){ if (miss.length) return photoState('drawn: missing ' + miss.join(', '));
     try { usePhotos(im); photoState('photo'); } catch (e){ photoState('drawn: ' + (e.name === 'SecurityError' ? 'the page may not read its images (opened from disk?)' : e.message)); } } }
 loadPhotos();
+if (HASH.test) addEventListener('load', function(){ /* test.py: the page's load event must not wait on the photos or the scans; claude.ai keeps an artifact blank until its frame has loaded */
+  var th = [].filter.call(document.querySelectorAll('#thumbs img'), function(i){ return i.complete && i.naturalWidth; }).length, p = document.body.appendChild(Object.assign(document.createElement('pre'), {id: 'load'}));
+  p.textContent = JSON.stringify({photos: th, finishes: PHOTO.state}); });
 
 /* materials by finish kind; a swatch tints them */
 var SURF = {lounge: ['wood', 'fabric'], floorlamp: ['wood', 'shade'], floorplant: ['clay'], art: ['wood', 'print'], sofa: ['fabric', 'fabric'], armchair: ['fabric', 'fabric'], ottoman: ['fabric', 'wood'], petbed: ['fabric', 'fabric'], bed: ['wood', 'fabric'], crib: ['paint', 'fabric'],

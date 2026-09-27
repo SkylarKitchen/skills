@@ -62,5 +62,5 @@ var CONFIG = {
        stands: [8, 100, 270], land: [60, 0.75, 0], poster: [200, 0.5, 0], abstract: [0.5, 40, 270], mirror: [259.25, 100, 90], tv: [190, 198.5, 180]},
      variants: {tv: 'On the wall'}}
   ],
-  PHOTOS: []
+  PHOTOS: [{src: 'photos/corner.jpg', label: 'Corner', at: [60, 60], h: 60, yaw: 45, pitch: 0, roll: 0, fov: 70}]   /* a stand-in photo, so test.py's load check covers the thumbnails */
 };
