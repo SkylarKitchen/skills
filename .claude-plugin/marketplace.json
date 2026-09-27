@@ -9,9 +9,9 @@
     {
       "name": "skylarkitchen-skills",
       "source": "./",
-      "description": "Agent skills for design work: 3D build guides and more.",
+      "description": "Agent skills for design work: 3D build guides, room layouts from photos, and more.",
       "category": "design",
-      "keywords": ["design", "skills", "three.js", "3d", "manual"]
+      "keywords": ["design", "skills", "three.js", "3d", "manual", "interior", "layout"]
     }
   ]
 }

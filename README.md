@@ -37,6 +37,7 @@ Skills for visual work: drawings, diagrams, and interactive pages.
 **Model-invoked**
 
 - **[3d-assembly-manual](./skills/design/3d-assembly-manual/SKILL.md)**: Build a phone-first, step-by-step 3D build guide (LEGO-manual pacing, BIG-diagram look) as a single Three.js HTML file, from a starter engine you only configure.
+- **[room-from-photos](./skills/design/room-from-photos/SKILL.md)**: Turn a few phone photos of an existing room into a near-photoreal 3D model and plan, with furniture layouts to compare, fit checks, and a gizmo to drag pieces around, as a single Three.js HTML file.
 
 ## License
 

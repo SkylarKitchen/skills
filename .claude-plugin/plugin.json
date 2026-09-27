@@ -1,15 +1,16 @@
 {
   "name": "skylarkitchen-skills",
-  "version": "1.0.0",
-  "description": "Skylar Kitchen's agent skills for design work: 3D build guides and more.",
+  "version": "1.1.0",
+  "description": "Skylar Kitchen's agent skills for design work: 3D build guides, room layouts from photos, and more.",
   "author": {
     "name": "Skylar Kitchen",
     "url": "https://github.com/SkylarKitchen"
   },
   "repository": "https://github.com/SkylarKitchen/skills",
   "license": "MIT",
-  "keywords": ["design", "skills", "three.js", "3d", "manual"],
+  "keywords": ["design", "skills", "three.js", "3d", "manual", "interior", "layout"],
   "skills": [
-    "./skills/design/3d-assembly-manual"
+    "./skills/design/3d-assembly-manual",
+    "./skills/design/room-from-photos"
   ]
 }

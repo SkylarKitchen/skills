@@ -1,0 +1,3 @@
+interface:
+  display_name: "Room from photos"
+  short_description: "Turn room photos into a 3D model with furniture layouts to compare"
