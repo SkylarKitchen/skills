@@ -41,5 +41,5 @@ Yes. The layout stacks below 760 px, and the model redraws only when something c
 - The layouts are different ideas, not three nudges of one.
 - Dragging a piece updates the checks and the open-floor figure at once.
 - The page loads with no console errors, at phone width and on a desktop.
-- `python3 test.py <project-dir>` passes: every drawn part of every piece sits where the fit checks think it is, so nothing floats, clips or hangs from nothing; the photo finishes load; and the photo view's light holds steady as you edit.
+- `python3 test.py <project-dir>` passes: every drawn part of every piece sits where the fit checks think it is, so nothing floats, clips or hangs from nothing; the photo finishes load, after the page rather than before it; and the photo view's light holds steady as you edit.
 - The page is served, not opened from disk: from `file://` a browser won't let it read its textures, so it falls back to drawn finishes.

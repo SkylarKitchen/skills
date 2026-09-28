@@ -655,7 +655,8 @@ function loadPhotos(){ if (!TEXDIR || (HASH.debug && HASH.drawn)) return photoSt
   keys.forEach(function(k){ var i = new Image(); i.onload = i.onerror = function(e){ if (e.type === 'error') miss.push(SCANS[k][0]); else im[k] = i; if (!--left) done(); }; i.src = TEXDIR + SCANS[k][0]; });
   function done(){ if (miss.length) return photoState('drawn: missing ' + miss.join(', '));
     try { usePhotos(im); photoState('photo'); } catch (e){ photoState('drawn: ' + (e.name === 'SecurityError' ? 'the page may not read its images (opened from disk?)' : e.message)); } } }
-loadPhotos();
+function afterLoad(f){ if (document.readyState === 'complete') f(); else addEventListener('load', f, {once: true}); }   /* images started before the page's load event hold it up, and claude.ai keeps an artifact blank until then */
+afterLoad(loadPhotos);
 if (HASH.test) addEventListener('load', function(){ /* test.py: the page's load event must not wait on the photos or the scans; claude.ai keeps an artifact blank until its frame has loaded */
   var th = [].filter.call(document.querySelectorAll('#thumbs img'), function(i){ return i.complete && i.naturalWidth; }).length, p = document.body.appendChild(Object.assign(document.createElement('pre'), {id: 'load'}));
   p.textContent = JSON.stringify({photos: th, finishes: PHOTO.state}); });
@@ -1113,12 +1114,12 @@ function photoCam(ph){ var y = (ph.yaw || 0) * Math.PI / 180, p = (ph.pitch || 0
 function enterPhoto(i){ var ph = PH[i], img = $('#photo'); mode = 'photo'; CEIL.visible = true; photoIdx = i; planDirty = true; img.hidden = false; img.style.opacity = $('#phOp').value; $('#phName').textContent = ph.label || 'Photo ' + (i + 1);
   $('#photoBar').hidden = false; $('#views').hidden = true; $('#zoomCtl').hidden = true; mc.style.cursor = 'default'; attachGizmo();
   var go = function(){ photoAspect = img.naturalWidth / img.naturalHeight || 4 / 3; photoCam(ph); cutTargets(); SEG.forEach(function(sg){ sg.cut = sg.target; applyCut(sg); }); shadowsDirty = dirty3 = true; };
-  if (img.getAttribute('src') !== ph.src){ img.onload = go; img.src = ph.src; } else go(); renderPhotos(); }
+  if (img.getAttribute('src') !== ph.src){ img.onload = go; afterLoad(function(){ img.src = ph.src; }); } else go(); renderPhotos(); }
 function exitPhoto(){ mode = 'model'; CEIL.visible = false; photoIdx = -1; planDirty = true; attachGizmo(); $('#photo').hidden = true; $('#photoBar').hidden = true; $('#views').hidden = false; $('#zoomCtl').hidden = false; cutTargets(); dirty3 = true; renderPhotos(); }
 $('#phExit').onclick = exitPhoto; $('#phOp').oninput = function(){ $('#photo').style.opacity = this.value; };
 function renderPhotos(){ $('#photosS').hidden = !PH.length; var box = $('#thumbs'); box.textContent = '';
   PH.forEach(function(ph, i){ var b = el('button', i === photoIdx ? 'on' : ''), im = el('img');
-    im.onload = function(){ ph._aspect = im.naturalWidth / im.naturalHeight; planDirty = true; }; im.src = ph.src; im.alt = ''; b.appendChild(im); b.appendChild(el('span', '', ph.label || 'Photo ' + (i + 1)));
+    im.onload = function(){ ph._aspect = im.naturalWidth / im.naturalHeight; planDirty = true; }; afterLoad(function(){ im.src = ph.src; }); im.alt = ''; b.appendChild(im); b.appendChild(el('span', '', ph.label || 'Photo ' + (i + 1)));
     b.onclick = function(){ if (photoIdx === i) exitPhoto(); else enterPhoto(i); }; box.appendChild(b); });
   var tn = $('#tune'); tn.textContent = ''; tn.hidden = photoIdx < 0; if (photoIdx < 0) return; var ph = PH[photoIdx];
   TUNE.forEach(function(f){ var lab = el('label', 'fld'), inp = el('input'); lab.appendChild(el('span', '', f[0])); inp.type = 'number'; inp.step = f[0] === 'x' || f[0] === 'y' || f[0] === 'h' ? 1 : 0.5;
