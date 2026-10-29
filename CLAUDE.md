@@ -5,7 +5,7 @@ Skills live in bucket folders under `skills/`:
 - `in-progress/`: public for feedback, not shipped in the plugin
 - `deprecated/`: retired
 
-Only `design/` exists so far; create a bucket when its first skill arrives. `design/` is promoted. Every skill in a promoted bucket needs all of these:
+`design/` and `in-progress/` exist so far; create a bucket when its first skill arrives. `design/` is promoted. Every skill in a promoted bucket needs all of these:
 
 1. An entry in the top-level `README.md` and in its bucket's `README.md`: the name linked to its `SKILL.md`, then a one-line description, grouped under **User-invoked** or **Model-invoked**.
 2. A path in the `skills` array of `.claude-plugin/plugin.json`. The plugin ships exactly the promoted set.

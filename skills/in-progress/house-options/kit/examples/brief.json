@@ -1,0 +1,36 @@
+{
+  "title": "Example house",
+  "who": "the owner",
+  "site": {
+    "lot": [[0,0],[220,0],[220,180],[0,180]],
+    "setbacks": [20, 20, 20, 20],
+    "lat": 35.5,
+    "region": "",
+    "climate": "hot humid summers, mild winters",
+    "slope": {"down": 180, "pct": 4},
+    "views": [{"dir": 180, "note": "open ground to the south"}],
+    "arrival": {"edge": 2, "at": 0.5},
+    "known": ["lot", "setbacks", "arrival"]
+  },
+  "budget": {"total": 600000, "covers": "house only, no land"},
+  "program": {
+    "rooms": [{"name": "Bedroom", "minSf": 150}, {"name": "Studio", "minSf": 130}],
+    "areaRange": [1200, 1500],
+    "storeys": 1,
+    "foundation": "any"
+  },
+  "wishes": [
+    {"id": "w1", "text": "A kitchen with light from the south",
+     "checks": [{"type": "glassFacing", "room": "Kitchen", "dir": 180, "within": 45, "minFt": 4}]},
+    {"id": "w2", "text": "The bedroom away from the living room",
+     "checks": [{"type": "notAdjacent", "a": "Bedroom", "b": "Living"}]},
+    {"id": "w3", "text": "A covered porch to the south",
+     "checks": [{"type": "porchFacing", "dir": 180, "within": 45, "minSf": 150}]},
+    {"id": "w4", "text": "It should feel calm", "checks": null}
+  ],
+  "criteria": ["wishes", "sun", "cost", "life", "idea"],
+  "weights": [30, 25, 20, 15, 10],
+  "style": ["simple sheds", "wood", "deep porches"],
+  "lite": false,
+  "node": "node"
+}

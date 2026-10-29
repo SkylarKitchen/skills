@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Option preview</title>
+<!-- shoot.cjs fills this template for one option and writes it as .preview-<key>.html beside the page; open that file
+     to look at one option alone. It needs no server: everything is inline but diagrams.js, which loads from this folder. -->
+<style>/*STYLE*/</style>
+</head><body><div class="wrap"><div class="legend" id="legend"></div><section class="sheet" id="sheet"></section><pre id="err" style="color:var(--pencil);white-space:pre-wrap"></pre></div>
+<script>
+window.__errs = [];
+window.addEventListener('error', e => { window.__errs.push(e.message+' @ '+(e.filename||'').split('/').pop().split('?')[0]+':'+e.lineno); document.getElementById('err').textContent = window.__errs.join('\n'); });
+</script>
+<script>/*SCRIPT*/</script>
+<!--DIAGRAMS-->
+</body></html>

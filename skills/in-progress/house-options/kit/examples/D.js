@@ -1,0 +1,78 @@
+// ---------------------------------------------------------------- D, the parallel pair: a worked example of the format (never on the page)
+{
+  const rN = y => 8.5 + 3.5*y/14;              // night bar: underside of roof, rising to the court
+  const rS = y => 8.5 + 5.5*(y-30)/17.333;     // day bar: rising from the court to the south wall
+  const ROT = 0, SUN = sunProfile(ROT);
+  OPT.D = {
+    name:'Parallel pair', no:'D', storeys:1, bed:'indoors, through the link',
+    site:{rotation:ROT, at:[40,150]}, foundation:'crawl',
+    sub:`Two bars side by side across a 16 ft court, joined by a glazed link: kitchen, dining and living in the south bar; the bedrooms, the studio and the bath in the north bar.`,
+    plan:[`You arrive from the north into the mud hall at the middle of the bedroom bar and walk straight through the glazed link, across the court, to the dining table. The two courts either side of the link are rooms without roofs: the west one is the kitchen's herb and rain garden, fed by a rain chain off the day bar's low eave; the east one belongs to the main bedroom.`,
+      `Both roofs rise to the south. The day bar is 8'-6" at the court and 14 ft at the south wall, where a lower porch roof covers the deck with a clerestory band above it. The court is 16 ft wide because that is what the December noon sun needs to clear the day bar and reach the foot of the bedroom bar's glass.`],
+    borrowed:[['Marie Short House (Glenn Murcutt, 1975)','two pavilions side by side and offset, each under its own roof, one for living and one for sleeping'],
+      ['Boyd Education Centre (Glenn Murcutt, 1999)','the high south wall, the lower porch roof and the clerestory between them'],
+      ['The courtyard house (a traditional type)','outdoor rooms closed on two or three sides by the house itself']],
+    pros:['Bed, bath and kitchen are all indoors, through a short glazed link.','One full bath serves the house, because nothing is split by an outdoor room.','Both bedrooms face south onto a court sheltered on three sides.'],
+    cons:['A lot of glass: the link is glass on both sides and the bedroom bar\'s court wall is glazed.','Two roofs and a flat link roof to flash where they meet.','The footprint is 48 ft by 55 ft, so it suits a deep lot more than a narrow one.'],
+    sectCap:`Section looking east through the living room, the east court and the main bedroom. At noon on 21 December the sun just clears the day bar's low eave and reaches the foot of the bedroom bar's south glass.`,
+    view:{x0:-7, y0:-8, x1:55, y1:61},
+    floors:[{r:[0,47.333,40,55.333],k:'deck'},{r:[0,14,16,30],k:'court'},{r:[24,14,48,30],k:'court'}],
+    stairs:[{r:[16,55.333,24,58.333],dir:'S',n:4},{r:[12.6,25.5,16,28.5],dir:'W',n:4},{r:[43.5,14,46.5,17.4],dir:'S',n:4}],
+    vols:[[0,0,48,14],[16,14,24,30],[0,30,40,47.333]],
+    cuts:[[16.667,13.333,23.333,14.667],[16.667,29.333,23.333,30.667]],
+    ward:[[32.167,0.667,34.167,8.167]],
+    parts:[[15.833,0.667,16.167,13.333],[23.833,0.667,24.167,9],[24.167,8.667,31.833,9],[31.833,0.667,32.167,13.333]],
+    open:[
+      {v:0,w:'N',a:6.5,b:9,k:'win'},{v:0,w:'N',a:18.5,b:21.5,k:'door'},{v:0,w:'N',a:26.5,b:29.5,k:'win'},{v:0,w:'N',a:44.2,b:46.7,k:'win'},{v:0,w:'E',a:3,b:7,k:'win'},
+      {v:0,w:'S',a:1.5,b:15.2,k:'glass'},{v:0,w:'S',a:24.8,b:31.2,k:'glass'},{v:0,w:'S',a:32.8,b:43.2,k:'glass'},{v:0,w:'S',a:43.5,b:46.5,k:'door'},
+      {v:1,w:'W',a:14.667,b:25.2,k:'glass'},{v:1,w:'W',a:25.5,b:28.5,k:'door'},{v:1,w:'E',a:14.667,b:29.333,k:'glass'},
+      {v:2,w:'N',a:5.5,b:9.5,k:'win'},{v:2,w:'N',a:26.5,b:29.5,k:'win'},
+      {v:2,w:'S',a:4,b:16,k:'glass'},{v:2,w:'S',a:16,b:24,k:'slide'},{v:2,w:'S',a:24,b:36,k:'glass'}],
+    idoors:[{r:[15.833,9.8,16.167,12.467],d:-1},{r:[24.8,8.667,27.467,9],d:-1},{r:[31.833,9.667,32.167,12.333],d:1}],
+    posts:[[0.5,55],[8,55],[16,55],[24,55],[32,55],[39.5,55]],
+    fx:[['desk',5.5,0.667,6,2.25],['sofa',0.667,5,3,6.667,'W'],['bench',16.167,4,1.5,4.5],['wd',21.333,3.9,2.5,2.5],
+      ['tub',24.167,0.667,5,2.5],['wc',29.5,0.667,2.333,2.5,'N'],['basin',29.6,6.867,2.233,1.8],['bed',38.5,0.667,5,6.667,'N'],
+      ['counter',0.667,30.667,13.5,2.083],['sink',6.25,30.667,2.5,2.083],['dw',8.75,30.667,2,2.083],['range',11.5,30.667,2.5,2.083],
+      ['tall',0.667,33.2,2.5,3],['fridge',0.667,36.2,2.5,2.667],['counter',4.5,36,8.5,3],['table',18.25,36.5,3.5,7.5,'v'],
+      ['hearth',36.8,36.5,2.533,4.5],['stove',37.3,37.75,1.5,2],['sofa',28,35.5,3,7,'W'],['chair',33,43,2.4,2.4],['chain',8,28.7]],
+    roofs:[[-1.5,-1.5, 49.5,-1.5, 49.5,15.5, -1.5,15.5],[16,15.5, 24,15.5, 24,28.5, 16,28.5],
+      [-1.5,28.5, 41.5,28.5, 41.5,48.833, -1.5,48.833],[-0.5,48.833, 40.5,48.833, 40.5,56.333, -0.5,56.333]],
+    rooms:[['Studio|BR2',9,7.2,192],['Mud|hall',20,9.6],['Bath',27.6,4.6],['Bedroom',40,10.4,192],['Link',20,20.5],
+      ['West court',8,19.5,0,'paper'],['East court',36,22,0,'paper'],['Kitchen',9,42.4],['Dining',20,34.2],['Living',34,33.4],['Deck, roofed',30,51.3,0,'paper']],
+    notes:[['herbs and rain garden',8,21.3],['rain chain',9.1,28.7,{align:'left'}]],
+    dims:[[0,0,16,0,-3.2],[16,0,24,0,-3.2],[24,0,48,0,-3.2],[0,0,48,0,-5.8],[0,0,0,14,-3.6],[0,14,0,30,-3.6],[0,30,0,47.333,-3.6],[0,47.333,0,55.333,-3.6]],
+    na:[51.5,40], sb:[28,58.5],
+    sect:{view:{y0:-3,y1:65,z0:-4,z1:20.5}, items:[
+      ['fill',[0.667,0, 13.333,0, 13.333,rN(13.333), 0.667,rN(0.667)]],
+      ['fill',[30.667,0, 46.666,0, 46.666,rS(46.666), 30.667,rS(30.667)]],
+      ['ground',-3,65],
+      ['beyond',box(0.667,0,7.333,2),true],['beyond',box(37.75,0,39.75,2.5),true],['beyond',[38.75,2.5,38.75,rS(38.75)]],
+      ['beyond',box(54.8,0,55.2,8.6),true],
+      ['found',0,14],['cut',box(0,0,0.667,8.6)],['cut',box(13.333,11,14,12)],['glass',13.667,0,11],
+      ['cut',[-1.5,rN(-1.5), 15.5,rN(15.5), 15.5,rN(15.5)+0.8, -1.5,rN(-1.5)+0.8]],
+      ['found',30,47.333],['cut',box(30,0,30.667,8.6)],
+      ['glass',47,0,8.2],['cut',box(46.666,8.2,47.333,10.5)],['glass',47,10.5,13.2],['cut',box(46.666,13.2,47.333,14)],
+      ['cut',[28.5,rS(28.5), 48.833,rS(48.833), 48.833,rS(48.833)+0.8, 28.5,rS(28.5)+0.8]],
+      ['found',47.333,55.333,'porch'],['cut',[47.333,9.4, 56.333,8.5, 56.333,9.1, 47.333,10]],
+      sunRay(28.5,8.85,SUN.dec,0.14,16,SUN.decLabel), sunRay(30.67,3.18,SUN.dec,3.18,29.55),
+      sunRay(56.333,8.5,SUN.jun,0,5,SUN.junLabel,true), sunRay(48.833,rS(48.833),SUN.jun,10.2,5,null,true),
+      ['label','Bedroom',7,4.3],['label','East court',22,-1.4],['label','Living',42,4.3],['label','Deck',51.3,1.2],['label','Clerestory',46,11.85,{align:'right'}]]},
+    mass:[
+      ...M.plinth(0,0,48,14), ...M.plinth(16,14,24,30), ...M.plinth(0,30,40,47.333),
+      M.deck(0,47.333,40,55.333),
+      ...M.shed({x0:0,y0:0,x1:48,y1:14,zn:8.5,zs:12,oN:1.5,oS:1.5,oW:1.5,oE:1.5,gS:[[1.5,15.2,0,11],[24.8,31.2,0,11],[32.8,43.2,0,11],[43.5,46.5,0,7.5]]}),
+      ...M.shed({x0:16,y0:14,x1:24,y1:30,zn:8,zs:8,noS:true,noRoof:true,gW:[[14.667,25.2,0,7.5],[25.5,28.5,0,7]]}),
+      ...M.roof(15.5,14,24.5,28.5,8,8),
+      ...M.shed({x0:0,y0:30,x1:40,y1:47.333,zn:8.5,zs:14,oN:1.5,oS:1.5,oW:1.5,oE:1.5,gS:[[4,36,0,8.2],[4,36,10.5,13.2]]}),
+      ...M.posts([[0.5,55],[8,55],[16,55],[24,55],[32,55],[39.5,55]], ()=>9.2),
+      ...M.roof(-0.5,47.333,40.5,56.333,10.2,9.1)],
+    key:{r:[24,14,48,30], name:'East court', as:'room'},
+    steps:[{says:'One deep block holding every room', mass:[...M.shed({x0:0,y0:0,x1:48,y1:47.333,zn:8.5,zs:14})]},
+      {says:'Pull it apart: a bedroom bar, a day bar and a court between them for the winter sun', mass:[...M.shed({x0:0,y0:0,x1:48,y1:14,zn:8.5,zs:12}), ...M.shed({x0:0,y0:30,x1:40,y1:47.333,zn:8.5,zs:14})]},
+      {says:'Join the bars with a glazed link', mass:[...M.shed({x0:0,y0:0,x1:48,y1:14,zn:8.5,zs:12}), ...M.shed({x0:16,y0:14,x1:24,y1:30,zn:8,zs:8}), ...M.shed({x0:0,y0:30,x1:40,y1:47.333,zn:8.5,zs:14})]}],
+    // perim: 254.67 around the plan + the night bar's south wall where it stands 4 ft clear of the link's flat roof, 8 ft (declared in rise) -> 262.67
+    rise:[[0,0,48,14]],
+    q:{platform:1813, footprint:1493, floorArea:1493, roofPlan:2192, perim:262.67, wallArea:1638, glass:1015, porch:320, porchRoofed:320, cond:1317, baths:1, heads:3, stairs:0}
+  };
+  OPT.D.steps.push({says:'Add a roofed deck on the south and glass on the courts', mass:OPT.D.mass});
+}

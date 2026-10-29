@@ -1,0 +1,46 @@
+<div class="wrap">
+  <h1>{{H1}}</h1>
+  <p class="lede">{{LEDE}}</p>
+  <p class="progress" id="progress"></p>
+  <div class="facts">
+{{FACTS}}
+  </div>
+
+  <section class="section" id="summary-sec">
+    <h2 id="summary-h">The options</h2>
+    <p id="summary-p"></p>
+    <div class="tablewrap"><table id="summary"></table></div>
+  </section>
+
+  <section class="section">
+    <h2>How to read a sheet</h2>
+    <p>Each option has one sheet. At the top, the diagrams show how the form was made, step by step, with the main move in red. Then the plans (north arrow turned to the true north on this lot), a section cut through the house with the noon sun at midwinter and midsummer, a view from above, and a site plan with true north up. Under them: the graders' scores, each wish measured from the plan, and the rough cost.</p>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <div id="sheets"></div>
+
+  <section class="section" id="todo-sec" hidden>
+    <h2>Still to draw</h2>
+    <p>Each option appears here once it passes its checks. This page reloads itself every minute until all are drawn.</p>
+    <ul class="todo" id="todo"></ul>
+  </section>
+
+  <section class="section">
+    <h2>How the rough cost was made</h2>
+    <p>{{COST_ABOUT}} Each plan's quantities (floor, wall, roof and glass areas, baths, stairs, porch) are measured from its drawings and multiplied by the national-average rates below. The total is then adjusted for the region, and a builder's overhead and a contingency are added. Rates as of {{COST_DATE}}.</p>
+    <p>{{LOCATION}}</p>
+{{COST_TABLE}}
+    <p>Read the totals as plus or minus 20%. They are for comparing plans with each other and with the budget, not a bid. A + after a cost marks work the table does not price; the option's sheet names it.</p>
+  </section>
+
+  <section class="section">
+    <h2>What the drawings assume</h2>
+    <ol>
+      <li>Sun angles are for noon at {{LAT}}&deg; N: {{SUN_DEC}}&deg; above the horizon on 21 December, {{SUN_JUN}}&deg; on 21 June. The section is cut square to the house, so on a house turned on its lot the rays show the angle the sun makes in that cut.</li>
+      <li>A slab floor stands 8 in above the ground, a crawlspace or pier floor 30 in.</li>
+      <li>Site facts given: {{KNOWN}}. Nothing else about the site is shown as fact.</li>
+      <li>Each wish marked yes or no is measured from the plan data. A wish that cannot be measured is judged by the graders.</li>
+    </ol>
+  </section>
+</div>

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Diagram preview</title>
+<style>@font-face{font-family:Geist;src:url(fonts/geist-latin-wght-normal.woff2) format('woff2');font-weight:100 900;font-style:normal;font-display:block}</style>
+<link rel="stylesheet" href="style.css">
+<style>.dg-head{display:flex;gap:12px;align-items:baseline;margin:34px 0 0}.dg-head b{font-size:22px}.dg-head span{font-size:18px;font-weight:600}</style>
+<script src="project.js"></script>
+</head><body><div class="wrap" id="root"><pre id="err" style="color:var(--pencil);white-space:pre-wrap"></pre></div>
+<script>
+// diagrams-preview.html?o=o01,o02[&b=brief.json]: the diagram set of each option, as the page mounts it (window.BRIEF from brief.json,
+// one <div class="diagrams" data-opt> per option, one shared parti scale). diagrams.cjs shoots it.
+window.__errs = [];
+window.addEventListener('error', e => { window.__errs.push(e.message + ' @ ' + (e.filename || '').split('/').pop().split('?')[0] + ':' + e.lineno); document.getElementById('err').textContent = window.__errs.join('\n'); });
+(async function(){
+  const q = new URLSearchParams(location.search), keys = (q.get('o') || '').split(',').filter(Boolean), bust = '?t=' + Date.now();
+  const load = src => new Promise((ok, no) => { const s = document.createElement('script'); s.src = src + bust; s.async = false; s.onload = ok; s.onerror = () => no(new Error('could not load ' + src)); document.body.appendChild(s); });
+  try {
+    await load('lib.js');
+    for (const k of keys) { try { await load('opts/' + k + '.js'); } catch (e) { await load('examples/' + k + '.js'); } }
+    // b=<file> reads another brief, b=none draws with no brief (the site plan drops out, the sun comes from the house's south)
+    const bf = q.get('b') || 'brief.json';
+    try { const r = bf === 'none' ? null : await fetch(bf + bust); window.BRIEF = r && r.ok ? await r.json() : null; } catch (e) { window.BRIEF = null; }
+    const root = document.getElementById('root');
+    for (const k of keys) { const o = OPT[k]; if (!o) { window.__errs.push('OPT.' + k + ' is not defined'); continue; }
+      const h = document.createElement('div'); h.className = 'dg-head'; h.innerHTML = '<b></b><span></span>'; h.firstChild.textContent = o.no || k; h.lastChild.textContent = o.name || '';
+      const m = document.createElement('div'); m.className = 'diagrams'; m.setAttribute('data-opt', k); m.id = 'dg-' + k;
+      root.appendChild(h); root.appendChild(m); }
+    await load('diagrams.js');
+    await window.HouseDiagrams.ready;
+  } catch (e) { window.__errs.push(e.message); document.getElementById('err').textContent = window.__errs.join('\n'); }
+  window.__done = true;
+})();
+</script></body></html>
